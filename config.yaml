@@ -1,0 +1,13 @@
+profiles:
+  dev:
+    environment: dev
+    content_backend: memory
+    metadata_backend: memory
+  staging:
+    environment: staging
+    content_backend: file
+    metadata_backend: file
+  prod:
+    environment: prod
+    content_backend: redis
+    metadata_backend: mysql

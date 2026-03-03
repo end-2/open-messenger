@@ -1,0 +1,10 @@
+{
+  "name": "open-messenger-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node src/index.js",
+    "test": "node --test src/index.test.js"
+  }
+}

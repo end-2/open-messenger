@@ -1,0 +1,60 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: open-messenger-api
+    environment:
+      OPEN_MESSENGER_ENVIRONMENT: dev
+      OPEN_MESSENGER_CONTENT_BACKEND: memory
+      OPEN_MESSENGER_METADATA_BACKEND: memory
+    ports:
+      - "8000:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: open-messenger-redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  mysql:
+    image: mysql:8.4
+    container_name: open-messenger-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: open_messenger
+      MYSQL_USER: app
+      MYSQL_PASSWORD: app
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    profiles:
+      - test
+    environment:
+      OPEN_MESSENGER_ENVIRONMENT: test
+      OPEN_MESSENGER_CONTENT_BACKEND: memory
+      OPEN_MESSENGER_METADATA_BACKEND: memory
+      PYTHONPATH: /app/backend
+    command: ["pytest", "-q", "backend/tests"]
+
+volumes:
+  mysql_data:

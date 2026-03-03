@@ -1,0 +1,28 @@
+# Local and Container Setup
+
+This document describes reproducible setup and test execution for the current scaffold.
+
+## Local Python Environment (venv)
+
+1. Create and populate the virtual environment:
+   - `make install`
+2. Run backend unit tests:
+   - `make test`
+3. Run the API server:
+   - `make run`
+
+## Docker Environment
+
+1. Start deployment test stack:
+   - `make up`
+2. Run backend unit tests in a container:
+   - `make test-docker`
+3. Run frontend scaffold unit test in a container:
+   - `make test-frontend-docker`
+4. Stop the stack:
+   - `make down`
+
+## Smoke Checks
+
+- `curl http://localhost:8000/healthz`
+- `curl http://localhost:8000/v1/info`

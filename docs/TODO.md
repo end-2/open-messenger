@@ -5,10 +5,10 @@
 
 ## 1. 프로젝트 부트스트랩
 
-- [ ] Python 3 백엔드 프로젝트 골격 생성 (`FastAPI`, `Uvicorn`, `asyncio`)
-- [ ] Node.js 프론트엔드 프로젝트 골격 생성 (`TypeScript`, `Next.js` 또는 BFF)
-- [ ] 공통 환경 설정 파일 정의 (`.env`, `config.yaml`, 실행 프로파일)
-- [ ] 로컬 개발용 기본 실행 스크립트 구성 (`make`, `npm scripts`)
+- [x] Python 3 백엔드 프로젝트 골격 생성 (`FastAPI`, `Uvicorn`, `asyncio`)
+- [x] Node.js 프론트엔드 프로젝트 골격 생성 (`TypeScript`, `Next.js` 또는 BFF)
+- [x] 공통 환경 설정 파일 정의 (`.env`, `config.yaml`, 실행 프로파일)
+- [x] 로컬 개발용 기본 실행 스크립트 구성 (`make`, `npm scripts`)
 
 ## 2. 도메인/데이터 모델
 
