@@ -112,12 +112,16 @@ curl http://localhost:8000/v1/channels/<channel_id> -H "Authorization: Bearer <t
 The token uses JWT-like format (`header.payload.signature`) signed with `HS256`.
 
 `/v1/info` reports the configured backend names and selected store implementation classes.
-Currently, `memory` and `file` backends are implemented. `redis` and `mysql` remain placeholders.
+`memory`, `file`, `redis`, and `mysql` backends are implemented.
 
 ## Storage Configuration
 
 - `OPEN_MESSENGER_CONTENT_BACKEND`: `memory | file | redis`
 - `OPEN_MESSENGER_METADATA_BACKEND`: `memory | file | mysql`
 - `OPEN_MESSENGER_STORAGE_DIR`: filesystem root used by `file` backends
+- `OPEN_MESSENGER_REDIS_URL`: Redis URL used by `redis` content backend
+- `OPEN_MESSENGER_REDIS_CONTENT_KEY_PREFIX`: Redis key prefix for message content
+- `OPEN_MESSENGER_MYSQL_DSN`: MySQL DSN used by `mysql` metadata backend
+- `OPEN_MESSENGER_MYSQL_TABLE_PREFIX`: table prefix used by MySQL metadata tables
 - `OPEN_MESSENGER_ADMIN_API_TOKEN`: required value for `X-Admin-Token` on `/admin/v1/*`
 - `OPEN_MESSENGER_TOKEN_SIGNING_SECRET`: signing secret for JWT-like token signature verification

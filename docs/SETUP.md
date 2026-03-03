@@ -14,6 +14,9 @@ This document describes reproducible setup and test execution for the current sc
 Optional: run with file-backed storage:
 - `OPEN_MESSENGER_CONTENT_BACKEND=file OPEN_MESSENGER_METADATA_BACKEND=file OPEN_MESSENGER_STORAGE_DIR=data/storage make run`
 
+Optional: run with redis/mysql-backed storage:
+- `OPEN_MESSENGER_CONTENT_BACKEND=redis OPEN_MESSENGER_METADATA_BACKEND=mysql OPEN_MESSENGER_REDIS_URL=redis://localhost:6379/0 OPEN_MESSENGER_MYSQL_DSN=mysql+pymysql://app:app@localhost:3306/open_messenger make run`
+
 ## Docker Environment
 
 1. Start deployment test stack:

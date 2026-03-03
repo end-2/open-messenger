@@ -7,6 +7,8 @@ from app.config import Settings
 from app.storage.file import FileMessageContentStore, FileMetadataStore
 from app.storage.interfaces import MessageContentStore, MetadataStore
 from app.storage.memory import InMemoryMessageContentStore, InMemoryMetadataStore
+from app.storage.mysql_store import MySQLMetadataStore
+from app.storage.redis_store import RedisMessageContentStore
 
 
 class UnsupportedMessageContentStore(MessageContentStore):
@@ -98,6 +100,11 @@ def build_storage_registry(settings: Settings) -> tuple[MessageContentStore, Met
         content_store = InMemoryMessageContentStore()
     elif settings.content_backend == "file":
         content_store = FileMessageContentStore(storage_root / "content")
+    elif settings.content_backend == "redis":
+        content_store = RedisMessageContentStore(
+            redis_url=settings.redis_url,
+            key_prefix=settings.redis_content_key_prefix,
+        )
     else:
         content_store = UnsupportedMessageContentStore(settings.content_backend)
 
@@ -105,6 +112,11 @@ def build_storage_registry(settings: Settings) -> tuple[MessageContentStore, Met
         metadata_store = InMemoryMetadataStore()
     elif settings.metadata_backend == "file":
         metadata_store = FileMetadataStore(storage_root / "metadata.json")
+    elif settings.metadata_backend == "mysql":
+        metadata_store = MySQLMetadataStore(
+            dsn=settings.mysql_dsn,
+            table_prefix=settings.mysql_table_prefix,
+        )
     else:
         metadata_store = UnsupportedMetadataStore(settings.metadata_backend)
 

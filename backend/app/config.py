@@ -13,6 +13,10 @@ class Settings(BaseSettings):
     content_backend: Literal["memory", "file", "redis"] = "memory"
     metadata_backend: Literal["memory", "file", "mysql"] = "memory"
     storage_dir: str = "data/storage"
+    redis_url: str = "redis://localhost:6379/0"
+    redis_content_key_prefix: str = "open_messenger:content"
+    mysql_dsn: str = "mysql+pymysql://app:app@localhost:3306/open_messenger"
+    mysql_table_prefix: str = "open_messenger"
     admin_api_token: str = "dev-admin-token"
     token_signing_secret: str = "dev-signing-secret"
 

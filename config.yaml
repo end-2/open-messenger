@@ -4,6 +4,10 @@ profiles:
     content_backend: memory
     metadata_backend: memory
     storage_dir: data/storage
+    redis_url: redis://localhost:6379/0
+    redis_content_key_prefix: open_messenger:content
+    mysql_dsn: mysql+pymysql://app:app@localhost:3306/open_messenger
+    mysql_table_prefix: open_messenger
     admin_api_token: dev-admin-token
     token_signing_secret: dev-signing-secret
   staging:
@@ -11,6 +15,10 @@ profiles:
     content_backend: file
     metadata_backend: file
     storage_dir: data/storage
+    redis_url: redis://redis:6379/0
+    redis_content_key_prefix: open_messenger:content
+    mysql_dsn: mysql+pymysql://app:app@mysql:3306/open_messenger
+    mysql_table_prefix: open_messenger
     admin_api_token: change-me-staging
     token_signing_secret: change-me-staging-signing-secret
   prod:
@@ -18,5 +26,9 @@ profiles:
     content_backend: redis
     metadata_backend: mysql
     storage_dir: data/storage
+    redis_url: redis://redis:6379/0
+    redis_content_key_prefix: open_messenger:content
+    mysql_dsn: mysql+pymysql://app:app@mysql:3306/open_messenger
+    mysql_table_prefix: open_messenger
     admin_api_token: change-me-prod
     token_signing_secret: change-me-prod-signing-secret

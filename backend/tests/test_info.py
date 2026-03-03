@@ -31,5 +31,5 @@ def test_info_uses_environment_configuration(monkeypatch, tmp_path) -> None:
         "content_backend": "file",
         "metadata_backend": "mysql",
         "content_store_impl": "FileMessageContentStore",
-        "metadata_store_impl": "UnsupportedMetadataStore",
+        "metadata_store_impl": "MySQLMetadataStore",
     }
