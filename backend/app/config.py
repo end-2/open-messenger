@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     metadata_backend: Literal["memory", "file", "mysql"] = "memory"
     storage_dir: str = "data/storage"
     admin_api_token: str = "dev-admin-token"
+    token_signing_secret: str = "dev-signing-secret"
 
     model_config = SettingsConfigDict(
         env_file=".env",

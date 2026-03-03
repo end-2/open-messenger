@@ -4,6 +4,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+from app.auth import decode_and_verify_jwt_like_token
 from app.main import create_app
 
 
@@ -42,6 +43,13 @@ def test_create_user_and_token_then_revoke() -> None:
     assert token_payload["token_id"].startswith("tok_")
     assert token_payload["token_type"] == "bot_token"
     assert token_payload["token"]
+    assert token_payload["token"].count(".") == 2
+
+    decoded_token = decode_and_verify_jwt_like_token(token_payload["token"], "dev-signing-secret")
+    assert decoded_token["tid"] == token_payload["token_id"]
+    assert decoded_token["sub"] == user["user_id"]
+    assert decoded_token["token_type"] == "bot_token"
+    assert decoded_token["scopes"] == ["messages:write", "channels:read"]
 
     stored_token = asyncio.run(client.app.state.metadata_store.get_token(token_payload["token_id"]))
     assert stored_token is not None

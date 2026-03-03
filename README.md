@@ -73,22 +73,22 @@ curl http://localhost:8000/v1/info
 Create and query a channel:
 
 ```bash
-curl -X POST http://localhost:8000/v1/channels -H "Content-Type: application/json" -d '{"name":"general"}'
-curl http://localhost:8000/v1/channels/<channel_id>
+curl -X POST http://localhost:8000/v1/channels -H "Content-Type: application/json" -H "Authorization: Bearer <token>" -d '{"name":"general"}'
+curl http://localhost:8000/v1/channels/<channel_id> -H "Authorization: Bearer <token>"
 ```
 
 Create and query messages:
 
 ```bash
-curl -X POST http://localhost:8000/v1/channels/<channel_id>/messages -H "Content-Type: application/json" -d '{"text":"hello"}'
-curl "http://localhost:8000/v1/channels/<channel_id>/messages?limit=20"
+curl -X POST http://localhost:8000/v1/channels/<channel_id>/messages -H "Content-Type: application/json" -H "Authorization: Bearer <token>" -d '{"text":"hello"}'
+curl "http://localhost:8000/v1/channels/<channel_id>/messages?limit=20" -H "Authorization: Bearer <token>"
 ```
 
 Create a thread from a root message and post a reply:
 
 ```bash
-curl -X POST http://localhost:8000/v1/channels/<channel_id>/threads -H "Content-Type: application/json" -d '{"root_message_id":"<message_id>"}'
-curl -X POST http://localhost:8000/v1/threads/<thread_id>/messages -H "Content-Type: application/json" -d '{"text":"thread reply"}'
+curl -X POST http://localhost:8000/v1/channels/<channel_id>/threads -H "Content-Type: application/json" -H "Authorization: Bearer <token>" -d '{"root_message_id":"<message_id>"}'
+curl -X POST http://localhost:8000/v1/threads/<thread_id>/messages -H "Content-Type: application/json" -H "Authorization: Bearer <token>" -d '{"text":"thread reply"}'
 ```
 
 Create an admin user and token:
@@ -102,6 +102,14 @@ curl -X DELETE http://localhost:8000/admin/v1/tokens/<token_id> -H "X-Admin-Toke
 Tokens are persisted as SHA-256 hashes; the plaintext token is returned only once at creation time.
 Admin endpoints require `X-Admin-Token` that matches `OPEN_MESSENGER_ADMIN_API_TOKEN`.
 
+Use JWT-like Bearer token on Native API requests:
+
+```bash
+curl http://localhost:8000/v1/channels/<channel_id> -H "Authorization: Bearer <token>"
+```
+
+The token uses JWT-like format (`header.payload.signature`) signed with `HS256`.
+
 `/v1/info` reports the configured backend names and selected store implementation classes.
 Currently, `memory` and `file` backends are implemented. `redis` and `mysql` remain placeholders.
 
@@ -111,3 +119,4 @@ Currently, `memory` and `file` backends are implemented. `redis` and `mysql` rem
 - `OPEN_MESSENGER_METADATA_BACKEND`: `memory | file | mysql`
 - `OPEN_MESSENGER_STORAGE_DIR`: filesystem root used by `file` backends
 - `OPEN_MESSENGER_ADMIN_API_TOKEN`: required value for `X-Admin-Token` on `/admin/v1/*`
+- `OPEN_MESSENGER_TOKEN_SIGNING_SECRET`: signing secret for JWT-like token signature verification

@@ -29,6 +29,7 @@ Optional: run with file-backed storage:
 
 - `curl http://localhost:8000/healthz`
 - `curl http://localhost:8000/v1/info`
-- `curl -X POST http://localhost:8000/v1/channels -H "Content-Type: application/json" -d '{"name":"general"}'`
-- `curl -X POST http://localhost:8000/v1/channels/<channel_id>/threads -H "Content-Type: application/json" -d '{"root_message_id":"<message_id>"}'`
+- `curl -X POST http://localhost:8000/v1/channels -H "Content-Type: application/json" -H "Authorization: Bearer <token>" -d '{"name":"general"}'`
+- `curl -X POST http://localhost:8000/v1/channels/<channel_id>/threads -H "Content-Type: application/json" -H "Authorization: Bearer <token>" -d '{"root_message_id":"<message_id>"}'`
 - `curl -X POST http://localhost:8000/admin/v1/users -H "Content-Type: application/json" -H "X-Admin-Token: dev-admin-token" -d '{"username":"alice"}'`
+- `curl http://localhost:8000/v1/channels/<channel_id> -H "Authorization: Bearer <token>"`

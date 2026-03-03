@@ -189,6 +189,10 @@ class MetadataStore(Protocol):
 ### 7.2 토큰 포맷/검증
 
 - 헤더: `Authorization: Bearer <token>`
+- Token format: JWT-like (`<base64url(header)>.<base64url(payload)>.<base64url(signature)>`)
+- Header claims: `alg=HS256`, `typ=JWT-LIKE`
+- Payload claims: `tid` (token_id), `sub` (user_id), `token_type`, `scopes`, `iat`
+- Signature: `HMAC-SHA256(base64url(header) + "." + base64url(payload), signing_secret)`
 - 토큰 저장 시 평문 저장 금지 (`sha256` 해시)
 - 스코프 예시: `channels:read`, `channels:write`, `messages:read`, `messages:write`, `files:write`
 
@@ -196,6 +200,7 @@ class MetadataStore(Protocol):
 
 - 토큰 생성 시 1회만 평문 노출
 - 토큰 회전(rotation) 및 폐기(revoke) API 제공
+- Native API 인증/인가는 JWT-like Bearer 토큰 검증 + scope 검사로 처리
 - IP allowlist(선택), rate limit 기본 적용
 - `user/token` 생성은 관리자 전용 `/admin/v1` 경로에서만 허용
 

@@ -31,9 +31,9 @@
 
 ## 4. 인증/인가
 
-- [ ] `Authorization: Bearer <token>` 파서 및 미들웨어 구현
+- [x] `Authorization: Bearer <token>` 파서 및 미들웨어 구현
 - [x] 토큰 해시 저장(`sha256`) 및 평문 1회 노출 정책 구현
-- [ ] 토큰 스코프 검사 구현 (`channels:*`, `messages:*`, `files:*`)
+- [x] 토큰 스코프 검사 구현 (`channels:*`, `messages:*`, `files:*`)
 - [ ] 토큰 회전(rotation) API 구현
 - [x] 토큰 폐기(revoke) API 구현
 - [ ] 기본 rate limit 적용

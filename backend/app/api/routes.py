@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import logging
 import secrets
 from datetime import datetime, timezone
@@ -10,6 +9,7 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, Field
 
+from app.auth import AuthContext, create_jwt_like_token, require_scopes, sha256_hexdigest
 from app.config import Settings, get_settings
 
 router = APIRouter()
@@ -109,10 +109,6 @@ def _utc_now_iso() -> str:
 
 def _new_id(prefix: str) -> str:
     return f"{prefix}_{uuid4().hex}"
-
-
-def _sha256(value: str) -> str:
-    return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
 async def require_admin_access(
@@ -242,6 +238,7 @@ def service_info(
 async def create_channel(
     payload: CreateChannelRequest,
     request: Request,
+    _: AuthContext = Depends(require_scopes(["channels:write"])),
 ) -> dict[str, Any]:
     metadata_store = request.app.state.metadata_store
     channel = {
@@ -253,7 +250,11 @@ async def create_channel(
 
 
 @router.get("/v1/channels/{channel_id}", response_model=ChannelResponse)
-async def get_channel(channel_id: str, request: Request) -> dict[str, Any]:
+async def get_channel(
+    channel_id: str,
+    request: Request,
+    _: AuthContext = Depends(require_scopes(["channels:read"])),
+) -> dict[str, Any]:
     metadata_store = request.app.state.metadata_store
     channel = await metadata_store.get_channel(channel_id)
     if channel is None:
@@ -270,6 +271,7 @@ async def create_channel_message(
     channel_id: str,
     payload: CreateMessageRequest,
     request: Request,
+    _: AuthContext = Depends(require_scopes(["messages:write"])),
 ) -> dict[str, Any]:
     metadata_store = request.app.state.metadata_store
     content_store = request.app.state.content_store
@@ -305,6 +307,7 @@ async def list_channel_messages(
     request: Request,
     cursor: Optional[str] = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
+    _: AuthContext = Depends(require_scopes(["messages:read"])),
 ) -> dict[str, Any]:
     metadata_store = request.app.state.metadata_store
     content_store = request.app.state.content_store
@@ -340,6 +343,7 @@ async def create_channel_thread(
     channel_id: str,
     payload: CreateThreadRequest,
     request: Request,
+    _: AuthContext = Depends(require_scopes(["messages:write"])),
 ) -> dict[str, Any]:
     metadata_store = request.app.state.metadata_store
 
@@ -377,6 +381,7 @@ async def create_thread_message(
     thread_id: str,
     payload: CreateMessageRequest,
     request: Request,
+    _: AuthContext = Depends(require_scopes(["messages:write"])),
 ) -> dict[str, Any]:
     metadata_store = request.app.state.metadata_store
     content_store = request.app.state.content_store
@@ -433,6 +438,7 @@ async def create_admin_user(
 async def create_admin_token(
     payload: CreateTokenRequest,
     request: Request,
+    settings: Settings = Depends(get_settings),
     _: None = Depends(require_admin_access),
 ) -> dict[str, Any]:
     metadata_store = request.app.state.metadata_store
@@ -440,17 +446,25 @@ async def create_admin_token(
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    plain_token = secrets.token_urlsafe(32)
     now = _utc_now_iso()
     token_record = {
         "token_id": _new_id("tok"),
         "user_id": payload.user_id,
         "token_type": payload.token_type,
         "scopes": payload.scopes,
-        "token_hash": _sha256(plain_token),
         "created_at": now,
         "revoked_at": None,
     }
+    token_payload = {
+        "tid": token_record["token_id"],
+        "sub": payload.user_id,
+        "token_type": payload.token_type,
+        "scopes": payload.scopes,
+        "iat": now,
+    }
+    plain_token = create_jwt_like_token(token_payload, settings.token_signing_secret)
+    token_record["token_hash"] = sha256_hexdigest(plain_token)
+
     stored = await metadata_store.create_token(token_record)
     audit_logger.info(
         "admin_token_created token_id=%s user_id=%s token_type=%s scopes=%d",
