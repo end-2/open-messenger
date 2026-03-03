@@ -84,6 +84,13 @@ curl -X POST http://localhost:8000/v1/channels/<channel_id>/messages -H "Content
 curl "http://localhost:8000/v1/channels/<channel_id>/messages?limit=20"
 ```
 
+Create a thread from a root message and post a reply:
+
+```bash
+curl -X POST http://localhost:8000/v1/channels/<channel_id>/threads -H "Content-Type: application/json" -d '{"root_message_id":"<message_id>"}'
+curl -X POST http://localhost:8000/v1/threads/<thread_id>/messages -H "Content-Type: application/json" -d '{"text":"thread reply"}'
+```
+
 `/v1/info` reports the configured backend names and selected store implementation classes.
 Currently, `memory` and `file` backends are implemented. `redis` and `mysql` remain placeholders.
 

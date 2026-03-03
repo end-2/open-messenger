@@ -47,3 +47,10 @@ def test_build_storage_registry_returns_unsupported_placeholders() -> None:
 
     with pytest.raises(NotImplementedError):
         asyncio.run(metadata_store.create_channel({"channel_id": "channel-a"}))
+
+    with pytest.raises(NotImplementedError):
+        asyncio.run(
+            metadata_store.create_thread(
+                {"thread_id": "th-1", "channel_id": "channel-a", "root_message_id": "msg-1"}
+            )
+        )

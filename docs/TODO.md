@@ -44,8 +44,8 @@
 - [x] `GET /v1/channels/{channel_id}`
 - [x] `POST /v1/channels/{channel_id}/messages`
 - [x] `GET /v1/channels/{channel_id}/messages`
-- [ ] `POST /v1/channels/{channel_id}/threads`
-- [ ] `POST /v1/threads/{thread_id}/messages`
+- [x] `POST /v1/channels/{channel_id}/threads`
+- [x] `POST /v1/threads/{thread_id}/messages`
 - [ ] `POST /v1/files` (multipart)
 - [ ] `GET /v1/files/{file_id}`
 - [x] Cursor pagination 공통 처리 구현

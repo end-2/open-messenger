@@ -75,6 +75,35 @@ class FileMetadataStore(MetadataStore):
             return None
         return deepcopy(record)
 
+    async def create_thread(self, thread: dict[str, Any]) -> dict[str, Any]:
+        thread_id = str(thread["thread_id"])
+        record = deepcopy(thread)
+
+        with self._lock:
+            database = self._read_database()
+            database["threads"][thread_id] = record
+            self._write_database(database)
+        return deepcopy(record)
+
+    async def get_thread(self, thread_id: str) -> dict[str, Any] | None:
+        with self._lock:
+            database = self._read_database()
+            record = database["threads"].get(thread_id)
+        if record is None:
+            return None
+        return deepcopy(record)
+
+    async def update_thread(self, thread_id: str, patch: dict[str, Any]) -> dict[str, Any] | None:
+        with self._lock:
+            database = self._read_database()
+            record = database["threads"].get(thread_id)
+            if record is None:
+                return None
+            record.update(deepcopy(patch))
+            database["threads"][thread_id] = record
+            self._write_database(database)
+        return deepcopy(record)
+
     async def create_message(self, msg: dict[str, Any]) -> dict[str, Any]:
         message_id = str(msg["message_id"])
         channel_id = str(msg["channel_id"])
@@ -120,6 +149,7 @@ class FileMetadataStore(MetadataStore):
             return
         empty_db: dict[str, Any] = {
             "channels": {},
+            "threads": {},
             "messages": {},
             "channel_index": {},
         }
@@ -127,7 +157,12 @@ class FileMetadataStore(MetadataStore):
 
     def _read_database(self) -> dict[str, Any]:
         with self._db_path.open("r", encoding="utf-8") as fp:
-            return json.load(fp)
+            database = json.load(fp)
+        database.setdefault("channels", {})
+        database.setdefault("threads", {})
+        database.setdefault("messages", {})
+        database.setdefault("channel_index", {})
+        return database
 
     def _write_database(self, payload: dict[str, Any]) -> None:
         tmp_path = self._db_path.with_suffix(".tmp")

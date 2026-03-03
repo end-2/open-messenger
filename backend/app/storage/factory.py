@@ -42,6 +42,15 @@ class UnsupportedMetadataStore(MetadataStore):
     async def get_channel(self, channel_id: str) -> dict[str, Any] | None:
         self._raise_not_supported()
 
+    async def create_thread(self, thread: dict[str, Any]) -> dict[str, Any]:
+        self._raise_not_supported()
+
+    async def get_thread(self, thread_id: str) -> dict[str, Any] | None:
+        self._raise_not_supported()
+
+    async def update_thread(self, thread_id: str, patch: dict[str, Any]) -> dict[str, Any] | None:
+        self._raise_not_supported()
+
     async def create_message(self, msg: dict[str, Any]) -> dict[str, Any]:
         self._raise_not_supported()
 

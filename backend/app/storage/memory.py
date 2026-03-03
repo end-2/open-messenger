@@ -30,6 +30,7 @@ class InMemoryMetadataStore(MetadataStore):
 
     def __init__(self) -> None:
         self._channels: dict[str, dict[str, Any]] = {}
+        self._threads: dict[str, dict[str, Any]] = {}
         self._messages: dict[str, dict[str, Any]] = {}
         self._channel_index: dict[str, list[str]] = {}
 
@@ -45,6 +46,25 @@ class InMemoryMetadataStore(MetadataStore):
         if channel is None:
             return None
         return deepcopy(channel)
+
+    async def create_thread(self, thread: dict[str, Any]) -> dict[str, Any]:
+        thread_id = str(thread["thread_id"])
+        record = deepcopy(thread)
+        self._threads[thread_id] = record
+        return deepcopy(record)
+
+    async def get_thread(self, thread_id: str) -> dict[str, Any] | None:
+        thread = self._threads.get(thread_id)
+        if thread is None:
+            return None
+        return deepcopy(thread)
+
+    async def update_thread(self, thread_id: str, patch: dict[str, Any]) -> dict[str, Any] | None:
+        thread = self._threads.get(thread_id)
+        if thread is None:
+            return None
+        thread.update(deepcopy(patch))
+        return deepcopy(thread)
 
     async def create_message(self, msg: dict[str, Any]) -> dict[str, Any]:
         message_id = str(msg["message_id"])

@@ -30,3 +30,4 @@ Optional: run with file-backed storage:
 - `curl http://localhost:8000/healthz`
 - `curl http://localhost:8000/v1/info`
 - `curl -X POST http://localhost:8000/v1/channels -H "Content-Type: application/json" -d '{"name":"general"}'`
+- `curl -X POST http://localhost:8000/v1/channels/<channel_id>/threads -H "Content-Type: application/json" -d '{"root_message_id":"<message_id>"}'`
