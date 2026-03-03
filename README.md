@@ -11,6 +11,7 @@ Baseline monorepo scaffold for the Open Messenger platform.
 - `docker-compose.yml`: Local deployment and containerized test environment
 - `Makefile`: Common local workflow commands
 - `config.yaml`: Baseline environment profile template
+- `scripts/e2e_native_api.py`: End-to-end Native API verification script
 
 ## Prerequisites
 
@@ -35,6 +36,12 @@ Run unit tests in local virtual environment:
 make test
 ```
 
+Run E2E checks locally (starts a temporary API server automatically):
+
+```bash
+make e2e
+```
+
 ## Docker Setup
 
 Start deployment test stack (API + Redis + MySQL):
@@ -53,6 +60,12 @@ Run unit tests inside Docker for reproducibility:
 
 ```bash
 make test-docker
+```
+
+Run E2E checks inside Docker:
+
+```bash
+make e2e-docker
 ```
 
 Run frontend scaffold unit test in Docker:

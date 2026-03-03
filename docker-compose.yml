@@ -15,6 +15,17 @@ services:
         condition: service_healthy
       mysql:
         condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2)",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
   redis:
     image: redis:7.4-alpine
@@ -55,6 +66,20 @@ services:
       OPEN_MESSENGER_METADATA_BACKEND: memory
       PYTHONPATH: /app/backend
     command: ["pytest", "-q", "backend/tests"]
+
+  e2e:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    profiles:
+      - test
+    environment:
+      OPEN_MESSENGER_E2E_BASE_URL: http://api:8000
+      OPEN_MESSENGER_E2E_ADMIN_TOKEN: dev-admin-token
+    command: ["python", "scripts/e2e_native_api.py"]
+    depends_on:
+      api:
+        condition: service_healthy
 
 volumes:
   mysql_data:

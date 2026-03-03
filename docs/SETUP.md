@@ -10,6 +10,8 @@ This document describes reproducible setup and test execution for the current sc
    - `make test`
 3. Run the API server:
    - `make run`
+4. Run end-to-end API checks (starts temporary API server automatically):
+   - `make e2e`
 
 Optional: run with file-backed storage:
 - `OPEN_MESSENGER_CONTENT_BACKEND=file OPEN_MESSENGER_METADATA_BACKEND=file OPEN_MESSENGER_STORAGE_DIR=data/storage make run`
@@ -26,9 +28,11 @@ Optional: customize file upload storage:
    - `make up`
 2. Run backend unit tests in a container:
    - `make test-docker`
-3. Run frontend scaffold unit test in a container:
+3. Run backend end-to-end API checks in a container:
+   - `make e2e-docker`
+4. Run frontend scaffold unit test in a container:
    - `make test-frontend-docker`
-4. Stop the stack:
+5. Stop the stack:
    - `make down`
 
 ## Smoke Checks

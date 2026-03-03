@@ -10,3 +10,6 @@
    - Use `venv` for local isolated Python environments.
    - Ensure tests can also run inside a `Docker` container for reproducibility and CI consistency.
    - Document setup and execution steps clearly in the project README.
+8. Run the E2E script after implementation changes:
+   - Local: `make e2e`
+   - Docker: `make e2e-docker`
