@@ -135,3 +135,32 @@ def test_file_metadata_store_persists_and_paginates(tmp_path) -> None:
     }
     assert asyncio.run(reloaded_store.get_thread("th-1")) is not None
     assert asyncio.run(reloaded_store.get_message(m1["message_id"])) == m1
+
+    asyncio.run(
+        store.create_message(
+            {
+                "message_id": "msg-idemp",
+                "channel_id": "channel-b",
+                "thread_id": None,
+                "content_ref": "content-idemp",
+                "idempotency_key": "req-1",
+            }
+        )
+    )
+    found = asyncio.run(store.find_message_by_idempotency("channel-b", None, "req-1"))
+    assert found is not None
+    assert found["message_id"] == "msg-idemp"
+
+    created_file = asyncio.run(
+        store.create_file(
+            {
+                "file_id": "fil-1",
+                "filename": "hello.txt",
+                "mime_type": "text/plain",
+                "size_bytes": 5,
+                "storage_path": "/tmp/hello.txt",
+                "sha256": "abc123",
+            }
+        )
+    )
+    assert asyncio.run(store.get_file("fil-1")) == created_file

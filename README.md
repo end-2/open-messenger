@@ -84,6 +84,13 @@ curl -X POST http://localhost:8000/v1/channels/<channel_id>/messages -H "Content
 curl "http://localhost:8000/v1/channels/<channel_id>/messages?limit=20" -H "Authorization: Bearer <token>"
 ```
 
+Upload and download a file:
+
+```bash
+curl -X POST http://localhost:8000/v1/files -H "Authorization: Bearer <token>" -F "file=@./README.md"
+curl -L http://localhost:8000/v1/files/<file_id> -H "Authorization: Bearer <token>" -o downloaded.bin
+```
+
 Create a thread from a root message and post a reply:
 
 ```bash
@@ -111,6 +118,19 @@ curl http://localhost:8000/v1/channels/<channel_id> -H "Authorization: Bearer <t
 
 The token uses JWT-like format (`header.payload.signature`) signed with `HS256`.
 
+`POST /v1/channels/{channel_id}/messages` and `POST /v1/threads/{thread_id}/messages` support `idempotency_key`.
+First request returns `201`, replay with the same key in the same channel/thread returns `200` and the original message.
+
+Errors are standardized as:
+
+```json
+{
+  "code": "channel_not_found",
+  "message": "Channel not found",
+  "retryable": false
+}
+```
+
 `/v1/info` reports the configured backend names and selected store implementation classes.
 `memory`, `file`, `redis`, and `mysql` backends are implemented.
 
@@ -123,5 +143,7 @@ The token uses JWT-like format (`header.payload.signature`) signed with `HS256`.
 - `OPEN_MESSENGER_REDIS_CONTENT_KEY_PREFIX`: Redis key prefix for message content
 - `OPEN_MESSENGER_MYSQL_DSN`: MySQL DSN used by `mysql` metadata backend
 - `OPEN_MESSENGER_MYSQL_TABLE_PREFIX`: table prefix used by MySQL metadata tables
+- `OPEN_MESSENGER_FILES_ROOT_DIR`: filesystem root used by `/v1/files` upload/download
+- `OPEN_MESSENGER_MAX_UPLOAD_MB`: max upload size in MB for `/v1/files`
 - `OPEN_MESSENGER_ADMIN_API_TOKEN`: required value for `X-Admin-Token` on `/admin/v1/*`
 - `OPEN_MESSENGER_TOKEN_SIGNING_SECRET`: signing secret for JWT-like token signature verification

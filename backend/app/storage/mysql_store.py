@@ -227,6 +227,49 @@ class MySQLMetadataStore(MetadataStore):
                 items.append(payload)
         return items
 
+    async def find_message_by_idempotency(
+        self,
+        channel_id: str,
+        thread_id: str | None,
+        idempotency_key: str,
+    ) -> dict[str, Any] | None:
+        row = await self._run_fetchone(
+            f"""
+            SELECT payload
+            FROM {self._table("messages")}
+            WHERE channel_id=%s
+              AND JSON_UNQUOTE(JSON_EXTRACT(payload, '$.idempotency_key'))=%s
+              AND (
+                (%s IS NULL AND JSON_EXTRACT(payload, '$.thread_id') IS NULL)
+                OR JSON_UNQUOTE(JSON_EXTRACT(payload, '$.thread_id'))=%s
+              )
+            ORDER BY sequence_id ASC
+            LIMIT 1
+            """,
+            (channel_id, idempotency_key, thread_id, thread_id),
+        )
+        return self._deserialize_row(row)
+
+    async def create_file(self, file_object: dict[str, Any]) -> dict[str, Any]:
+        file_id = str(file_object["file_id"])
+        record = deepcopy(file_object)
+        await self._run_write(
+            f"""
+            INSERT INTO {self._table("files")} (entity_id, payload)
+            VALUES (%s, %s)
+            ON DUPLICATE KEY UPDATE payload=VALUES(payload)
+            """,
+            (file_id, self._serialize(record)),
+        )
+        return deepcopy(record)
+
+    async def get_file(self, file_id: str) -> dict[str, Any] | None:
+        row = await self._run_fetchone(
+            f"SELECT payload FROM {self._table('files')} WHERE entity_id=%s",
+            (file_id,),
+        )
+        return self._deserialize_row(row)
+
     def _initialize(self) -> None:
         for statement in self._schema_statements():
             self._run_write_sync(statement)
@@ -264,6 +307,12 @@ class MySQLMetadataStore(MetadataStore):
                 channel_id VARCHAR(128) NOT NULL,
                 payload JSON NOT NULL,
                 INDEX idx_{self._table_prefix}_messages_channel_sequence (channel_id, sequence_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            """,
+            f"""
+            CREATE TABLE IF NOT EXISTS {self._table("files")} (
+                entity_id VARCHAR(128) PRIMARY KEY,
+                payload JSON NOT NULL
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
             """,
         ]

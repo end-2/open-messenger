@@ -34,6 +34,7 @@ class InMemoryMetadataStore(MetadataStore):
         self._channels: dict[str, dict[str, Any]] = {}
         self._threads: dict[str, dict[str, Any]] = {}
         self._messages: dict[str, dict[str, Any]] = {}
+        self._files: dict[str, dict[str, Any]] = {}
         self._channel_index: dict[str, list[str]] = {}
 
     async def create_user(self, user: dict[str, Any]) -> dict[str, Any]:
@@ -131,3 +132,30 @@ class InMemoryMetadataStore(MetadataStore):
 
         selected_ids = message_ids[start_idx : start_idx + max(limit, 0)]
         return [deepcopy(self._messages[msg_id]) for msg_id in selected_ids]
+
+    async def find_message_by_idempotency(
+        self,
+        channel_id: str,
+        thread_id: str | None,
+        idempotency_key: str,
+    ) -> dict[str, Any] | None:
+        for message_id in self._channel_index.get(channel_id, []):
+            record = self._messages[message_id]
+            if (
+                record.get("idempotency_key") == idempotency_key
+                and record.get("thread_id") == thread_id
+            ):
+                return deepcopy(record)
+        return None
+
+    async def create_file(self, file_object: dict[str, Any]) -> dict[str, Any]:
+        file_id = str(file_object["file_id"])
+        record = deepcopy(file_object)
+        self._files[file_id] = record
+        return deepcopy(record)
+
+    async def get_file(self, file_id: str) -> dict[str, Any] | None:
+        record = self._files.get(file_id)
+        if record is None:
+            return None
+        return deepcopy(record)

@@ -46,11 +46,11 @@
 - [x] `GET /v1/channels/{channel_id}/messages`
 - [x] `POST /v1/channels/{channel_id}/threads`
 - [x] `POST /v1/threads/{thread_id}/messages`
-- [ ] `POST /v1/files` (multipart)
-- [ ] `GET /v1/files/{file_id}`
+- [x] `POST /v1/files` (multipart)
+- [x] `GET /v1/files/{file_id}`
 - [x] Cursor pagination 공통 처리 구현
-- [ ] Idempotency Key 처리(`idempotency_key`) 구현
-- [ ] 구조화 에러 응답 표준 구현 (`code`, `message`, `retryable`)
+- [x] Idempotency Key 처리(`idempotency_key`) 구현
+- [x] 구조화 에러 응답 표준 구현 (`code`, `message`, `retryable`)
 
 ## 6. Admin API (`/admin/v1`)
 

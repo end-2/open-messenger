@@ -82,6 +82,20 @@ class UnsupportedMetadataStore(MetadataStore):
     ) -> list[dict[str, Any]]:
         self._raise_not_supported()
 
+    async def find_message_by_idempotency(
+        self,
+        channel_id: str,
+        thread_id: str | None,
+        idempotency_key: str,
+    ) -> dict[str, Any] | None:
+        self._raise_not_supported()
+
+    async def create_file(self, file_object: dict[str, Any]) -> dict[str, Any]:
+        self._raise_not_supported()
+
+    async def get_file(self, file_id: str) -> dict[str, Any] | None:
+        self._raise_not_supported()
+
     def _raise_not_supported(self) -> None:
         raise NotImplementedError(
             f"Metadata backend '{self.backend_name}' is not implemented yet."

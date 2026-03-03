@@ -62,3 +62,17 @@ class MetadataStore(Protocol):
         limit: int,
     ) -> list[dict[str, Any]]:
         ...
+
+    async def find_message_by_idempotency(
+        self,
+        channel_id: str,
+        thread_id: str | None,
+        idempotency_key: str,
+    ) -> dict[str, Any] | None:
+        ...
+
+    async def create_file(self, file_object: dict[str, Any]) -> dict[str, Any]:
+        ...
+
+    async def get_file(self, file_id: str) -> dict[str, Any] | None:
+        ...

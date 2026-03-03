@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     redis_content_key_prefix: str = "open_messenger:content"
     mysql_dsn: str = "mysql+pymysql://app:app@localhost:3306/open_messenger"
     mysql_table_prefix: str = "open_messenger"
+    files_root_dir: str = "data/files"
+    max_upload_mb: int = 50
     admin_api_token: str = "dev-admin-token"
     token_signing_secret: str = "dev-signing-secret"
 

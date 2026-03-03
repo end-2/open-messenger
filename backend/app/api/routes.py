@@ -1,15 +1,20 @@
 from __future__ import annotations
 
+import hashlib
 import logging
+import re
 import secrets
+from pathlib import Path
 from typing import Any, Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, Depends, File, Query, Request, Response, UploadFile, status
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from app.auth import AuthContext, create_jwt_like_token, require_scopes, sha256_hexdigest
 from app.config import Settings, get_settings
-from app.domain import Channel, Message, MessageContent, Thread, Token, User
+from app.domain import Channel, FileObject, Message, MessageContent, Thread, Token, User
+from app.errors import api_error
 from app.utils import new_prefixed_ulid, utc_now_iso8601
 
 router = APIRouter()
@@ -103,12 +108,41 @@ class CreateTokenResponse(TokenResponse):
     token: str
 
 
+class FileObjectResponse(BaseModel):
+    file_id: str
+    uploader_user_id: str
+    filename: str
+    mime_type: str
+    size_bytes: int
+    sha256: str
+    created_at: str
+
+
 def _utc_now_iso() -> str:
     return utc_now_iso8601()
 
 
 def _new_id(prefix: str) -> str:
     return new_prefixed_ulid(prefix)
+
+
+def _sanitize_filename(raw_filename: str | None) -> str:
+    candidate = Path(raw_filename or "upload.bin").name.strip()
+    if not candidate:
+        candidate = "upload.bin"
+    return re.sub(r"[^A-Za-z0-9._-]", "_", candidate)
+
+
+def _build_file_response(stored: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "file_id": str(stored["file_id"]),
+        "uploader_user_id": str(stored["uploader_user_id"]),
+        "filename": str(stored["filename"]),
+        "mime_type": str(stored.get("mime_type", "application/octet-stream")),
+        "size_bytes": int(stored.get("size_bytes", 0)),
+        "sha256": str(stored.get("sha256", "")),
+        "created_at": str(stored.get("created_at", "")),
+    }
 
 
 async def require_admin_access(
@@ -124,7 +158,12 @@ async def require_admin_access(
             request.url.path,
             request.method,
         )
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access denied")
+        raise api_error(
+            status_code=status.HTTP_403_FORBIDDEN,
+            code="admin_access_denied",
+            message="Admin access denied",
+            retryable=False,
+        )
 
 
 def _build_message_response(
@@ -154,12 +193,23 @@ async def _store_message(
     metadata_store: Any,
     content_store: Any,
     force_thread_id: Optional[str] = None,
-) -> tuple[dict[str, Any], str]:
+) -> tuple[dict[str, Any], str, bool]:
     message_id = _new_id("msg")
     content_ref = _new_id("cnt")
     now = _utc_now_iso()
 
     resolved_thread_id = force_thread_id if force_thread_id is not None else payload.thread_id
+
+    if payload.idempotency_key:
+        existing = await metadata_store.find_message_by_idempotency(
+            channel_id=channel_id,
+            thread_id=resolved_thread_id,
+            idempotency_key=payload.idempotency_key,
+        )
+        if existing is not None:
+            existing_content = await content_store.get(str(existing["content_ref"])) or {}
+            occurred_at = str(existing.get("updated_at") or existing.get("created_at") or now)
+            return _build_message_response(existing, existing_content), occurred_at, False
 
     content_payload = MessageContent(
         text=payload.text,
@@ -184,7 +234,7 @@ async def _store_message(
         metadata=payload.metadata,
     ).to_dict()
     stored_metadata = await metadata_store.create_message(message_metadata)
-    return _build_message_response(stored_metadata, content_payload), now
+    return _build_message_response(stored_metadata, content_payload), now, True
 
 
 async def _increment_thread_reply(
@@ -194,7 +244,12 @@ async def _increment_thread_reply(
 ) -> dict[str, Any]:
     thread = await metadata_store.get_thread(thread_id)
     if thread is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found")
+        raise api_error(
+            status_code=status.HTTP_404_NOT_FOUND,
+            code="thread_not_found",
+            message="Thread not found",
+            retryable=False,
+        )
 
     patch = {
         "reply_count": int(thread.get("reply_count", 0)) + 1,
@@ -202,7 +257,12 @@ async def _increment_thread_reply(
     }
     updated = await metadata_store.update_thread(thread_id, patch)
     if updated is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found")
+        raise api_error(
+            status_code=status.HTTP_404_NOT_FOUND,
+            code="thread_not_found",
+            message="Thread not found",
+            retryable=False,
+        )
     return updated
 
 
@@ -257,7 +317,12 @@ async def get_channel(
     metadata_store = request.app.state.metadata_store
     channel = await metadata_store.get_channel(channel_id)
     if channel is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Channel not found")
+        raise api_error(
+            status_code=status.HTTP_404_NOT_FOUND,
+            code="channel_not_found",
+            message="Channel not found",
+            retryable=False,
+        )
     return channel
 
 
@@ -270,6 +335,7 @@ async def create_channel_message(
     channel_id: str,
     payload: CreateMessageRequest,
     request: Request,
+    response: Response,
     _: AuthContext = Depends(require_scopes(["messages:write"])),
 ) -> dict[str, Any]:
     metadata_store = request.app.state.metadata_store
@@ -277,27 +343,41 @@ async def create_channel_message(
 
     channel = await metadata_store.get_channel(channel_id)
     if channel is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Channel not found")
+        raise api_error(
+            status_code=status.HTTP_404_NOT_FOUND,
+            code="channel_not_found",
+            message="Channel not found",
+            retryable=False,
+        )
 
     if payload.thread_id is not None:
         thread = await metadata_store.get_thread(payload.thread_id)
         if thread is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found")
+            raise api_error(
+                status_code=status.HTTP_404_NOT_FOUND,
+                code="thread_not_found",
+                message="Thread not found",
+                retryable=False,
+            )
         if str(thread.get("channel_id")) != channel_id:
-            raise HTTPException(
+            raise api_error(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Thread does not belong to the channel",
+                code="thread_channel_mismatch",
+                message="Thread does not belong to the channel",
+                retryable=False,
             )
 
-    response, occurred_at = await _store_message(
+    message_response, occurred_at, created = await _store_message(
         channel_id=channel_id,
         payload=payload,
         metadata_store=metadata_store,
         content_store=content_store,
     )
-    if payload.thread_id is not None:
+    if payload.thread_id is not None and created:
         await _increment_thread_reply(metadata_store, payload.thread_id, occurred_at)
-    return response
+    if not created:
+        response.status_code = status.HTTP_200_OK
+    return message_response
 
 
 @router.get("/v1/channels/{channel_id}/messages", response_model=ListMessagesResponse)
@@ -313,7 +393,12 @@ async def list_channel_messages(
 
     channel = await metadata_store.get_channel(channel_id)
     if channel is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Channel not found")
+        raise api_error(
+            status_code=status.HTTP_404_NOT_FOUND,
+            code="channel_not_found",
+            message="Channel not found",
+            retryable=False,
+        )
 
     stored_messages = await metadata_store.list_channel_messages(channel_id, cursor, limit)
 
@@ -348,15 +433,27 @@ async def create_channel_thread(
 
     channel = await metadata_store.get_channel(channel_id)
     if channel is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Channel not found")
+        raise api_error(
+            status_code=status.HTTP_404_NOT_FOUND,
+            code="channel_not_found",
+            message="Channel not found",
+            retryable=False,
+        )
 
     root_message = await metadata_store.get_message(payload.root_message_id)
     if root_message is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Root message not found")
+        raise api_error(
+            status_code=status.HTTP_404_NOT_FOUND,
+            code="root_message_not_found",
+            message="Root message not found",
+            retryable=False,
+        )
     if str(root_message.get("channel_id")) != channel_id:
-        raise HTTPException(
+        raise api_error(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Root message does not belong to the channel",
+            code="root_message_channel_mismatch",
+            message="Root message does not belong to the channel",
+            retryable=False,
         )
 
     now = _utc_now_iso()
@@ -380,6 +477,7 @@ async def create_thread_message(
     thread_id: str,
     payload: CreateMessageRequest,
     request: Request,
+    response: Response,
     _: AuthContext = Depends(require_scopes(["messages:write"])),
 ) -> dict[str, Any]:
     metadata_store = request.app.state.metadata_store
@@ -387,24 +485,124 @@ async def create_thread_message(
 
     thread = await metadata_store.get_thread(thread_id)
     if thread is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found")
+        raise api_error(
+            status_code=status.HTTP_404_NOT_FOUND,
+            code="thread_not_found",
+            message="Thread not found",
+            retryable=False,
+        )
 
     if payload.thread_id is not None and payload.thread_id != thread_id:
-        raise HTTPException(
+        raise api_error(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Thread ID in payload does not match URL",
+            code="thread_id_mismatch",
+            message="Thread ID in payload does not match URL",
+            retryable=False,
         )
 
     channel_id = str(thread["channel_id"])
-    response, occurred_at = await _store_message(
+    message_response, occurred_at, created = await _store_message(
         channel_id=channel_id,
         payload=payload,
         metadata_store=metadata_store,
         content_store=content_store,
         force_thread_id=thread_id,
     )
-    await _increment_thread_reply(metadata_store, thread_id, occurred_at)
-    return response
+    if created:
+        await _increment_thread_reply(metadata_store, thread_id, occurred_at)
+    else:
+        response.status_code = status.HTTP_200_OK
+    return message_response
+
+
+@router.post(
+    "/v1/files",
+    response_model=FileObjectResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def upload_file(
+    request: Request,
+    file: UploadFile = File(...),
+    context: AuthContext = Depends(require_scopes(["files:write"])),
+) -> dict[str, Any]:
+    settings: Settings = request.app.state.settings
+    metadata_store = request.app.state.metadata_store
+
+    files_root = Path(settings.files_root_dir)
+    files_root.mkdir(parents=True, exist_ok=True)
+
+    file_id = _new_id("fil")
+    safe_filename = _sanitize_filename(file.filename)
+    storage_path = files_root / f"{file_id}_{safe_filename}"
+    max_size_bytes = int(settings.max_upload_mb * 1024 * 1024)
+
+    digest = hashlib.sha256()
+    size_bytes = 0
+
+    try:
+        with storage_path.open("wb") as fp:
+            while True:
+                chunk = await file.read(1024 * 1024)
+                if not chunk:
+                    break
+                size_bytes += len(chunk)
+                if size_bytes > max_size_bytes:
+                    fp.close()
+                    storage_path.unlink(missing_ok=True)
+                    raise api_error(
+                        status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                        code="file_too_large",
+                        message=f"File exceeds max upload size of {settings.max_upload_mb} MB",
+                        retryable=False,
+                    )
+                digest.update(chunk)
+                fp.write(chunk)
+    finally:
+        await file.close()
+
+    file_object = FileObject(
+        file_id=file_id,
+        uploader_user_id=context.user_id,
+        filename=safe_filename,
+        mime_type=file.content_type or "application/octet-stream",
+        size_bytes=size_bytes,
+        storage_path=str(storage_path),
+        sha256=digest.hexdigest(),
+    ).to_dict()
+    stored = await metadata_store.create_file(file_object)
+    return _build_file_response(stored)
+
+
+@router.get("/v1/files/{file_id}")
+async def get_file(
+    file_id: str,
+    request: Request,
+    _: AuthContext = Depends(require_scopes(["files:read"])),
+) -> FileResponse:
+    metadata_store = request.app.state.metadata_store
+    file_object = await metadata_store.get_file(file_id)
+    if file_object is None:
+        raise api_error(
+            status_code=status.HTTP_404_NOT_FOUND,
+            code="file_not_found",
+            message="File not found",
+            retryable=False,
+        )
+
+    storage_path = Path(str(file_object.get("storage_path", "")))
+    if not storage_path.exists():
+        raise api_error(
+            status_code=status.HTTP_404_NOT_FOUND,
+            code="file_not_found",
+            message="File not found",
+            retryable=False,
+        )
+
+    return FileResponse(
+        path=storage_path,
+        media_type=str(file_object.get("mime_type") or "application/octet-stream"),
+        filename=str(file_object.get("filename") or storage_path.name),
+    )
 
 
 @router.post(
@@ -442,7 +640,12 @@ async def create_admin_token(
     metadata_store = request.app.state.metadata_store
     user = await metadata_store.get_user(payload.user_id)
     if user is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise api_error(
+            status_code=status.HTTP_404_NOT_FOUND,
+            code="user_not_found",
+            message="User not found",
+            retryable=False,
+        )
 
     now = _utc_now_iso()
     token_record = Token(
@@ -494,7 +697,12 @@ async def revoke_admin_token(
     metadata_store = request.app.state.metadata_store
     token = await metadata_store.get_token(token_id)
     if token is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Token not found")
+        raise api_error(
+            status_code=status.HTTP_404_NOT_FOUND,
+            code="token_not_found",
+            message="Token not found",
+            retryable=False,
+        )
 
     if token.get("revoked_at") is None:
         await metadata_store.update_token(token_id, {"revoked_at": _utc_now_iso()})

@@ -191,6 +191,41 @@ class FileMetadataStore(MetadataStore):
             records = [deepcopy(database["messages"][msg_id]) for msg_id in selected_ids]
         return records
 
+    async def find_message_by_idempotency(
+        self,
+        channel_id: str,
+        thread_id: str | None,
+        idempotency_key: str,
+    ) -> dict[str, Any] | None:
+        with self._lock:
+            database = self._read_database()
+            for message_id in database["channel_index"].get(channel_id, []):
+                record = database["messages"][message_id]
+                if (
+                    record.get("idempotency_key") == idempotency_key
+                    and record.get("thread_id") == thread_id
+                ):
+                    return deepcopy(record)
+        return None
+
+    async def create_file(self, file_object: dict[str, Any]) -> dict[str, Any]:
+        file_id = str(file_object["file_id"])
+        record = deepcopy(file_object)
+
+        with self._lock:
+            database = self._read_database()
+            database["files"][file_id] = record
+            self._write_database(database)
+        return deepcopy(record)
+
+    async def get_file(self, file_id: str) -> dict[str, Any] | None:
+        with self._lock:
+            database = self._read_database()
+            record = database["files"].get(file_id)
+        if record is None:
+            return None
+        return deepcopy(record)
+
     def _initialize(self) -> None:
         if self._db_path.exists():
             return
@@ -200,6 +235,7 @@ class FileMetadataStore(MetadataStore):
             "channels": {},
             "threads": {},
             "messages": {},
+            "files": {},
             "channel_index": {},
         }
         self._write_database(empty_db)
@@ -212,6 +248,7 @@ class FileMetadataStore(MetadataStore):
         database.setdefault("channels", {})
         database.setdefault("threads", {})
         database.setdefault("messages", {})
+        database.setdefault("files", {})
         database.setdefault("channel_index", {})
         return database
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -13,6 +14,8 @@ DEFAULT_NATIVE_SCOPES = [
     "channels:write",
     "messages:read",
     "messages:write",
+    "files:read",
+    "files:write",
 ]
 
 
@@ -274,3 +277,136 @@ def test_native_api_works_with_file_backends(monkeypatch, tmp_path) -> None:
     assert metadata_file.exists()
     assert content_dir.exists()
     assert any(content_dir.iterdir())
+
+
+def test_channel_message_idempotency_reuses_existing_message() -> None:
+    client = TestClient(create_app())
+    headers = _issue_bearer_headers(client)
+    channel_id = _create_channel(client, headers)
+
+    first = client.post(
+        f"/v1/channels/{channel_id}/messages",
+        json={"text": "hello", "idempotency_key": "req-1"},
+        headers=headers,
+    )
+    second = client.post(
+        f"/v1/channels/{channel_id}/messages",
+        json={"text": "hello", "idempotency_key": "req-1"},
+        headers=headers,
+    )
+
+    assert first.status_code == 201
+    assert second.status_code == 200
+    assert second.json()["message_id"] == first.json()["message_id"]
+    assert second.json()["content_ref"] == first.json()["content_ref"]
+
+    listed = client.get(f"/v1/channels/{channel_id}/messages", headers=headers)
+    assert listed.status_code == 200
+    assert len(listed.json()["items"]) == 1
+
+
+def test_thread_message_idempotency_reuses_existing_message() -> None:
+    client = TestClient(create_app())
+    headers = _issue_bearer_headers(client)
+    channel_id = _create_channel(client, headers)
+
+    root = client.post(
+        f"/v1/channels/{channel_id}/messages",
+        json={"text": "root"},
+        headers=headers,
+    )
+    assert root.status_code == 201
+
+    thread = client.post(
+        f"/v1/channels/{channel_id}/threads",
+        json={"root_message_id": root.json()["message_id"]},
+        headers=headers,
+    )
+    assert thread.status_code == 201
+    thread_id = thread.json()["thread_id"]
+
+    first = client.post(
+        f"/v1/threads/{thread_id}/messages",
+        json={"text": "reply", "idempotency_key": "req-thread-1"},
+        headers=headers,
+    )
+    second = client.post(
+        f"/v1/threads/{thread_id}/messages",
+        json={"text": "reply", "idempotency_key": "req-thread-1"},
+        headers=headers,
+    )
+
+    assert first.status_code == 201
+    assert second.status_code == 200
+    assert second.json()["message_id"] == first.json()["message_id"]
+
+    listed = client.get(f"/v1/channels/{channel_id}/messages", headers=headers)
+    assert listed.status_code == 200
+    assert [item["text"] for item in listed.json()["items"]] == ["root", "reply"]
+
+
+def test_upload_and_download_file() -> None:
+    client = TestClient(create_app())
+    headers = _issue_bearer_headers(client)
+
+    payload = b"hello file"
+    upload = client.post(
+        "/v1/files",
+        files={"file": ("hello.txt", payload, "text/plain")},
+        headers=headers,
+    )
+    assert upload.status_code == 201
+    uploaded = upload.json()
+    assert is_valid_prefixed_ulid(uploaded["file_id"], "fil")
+    assert uploaded["filename"] == "hello.txt"
+    assert uploaded["mime_type"] == "text/plain"
+    assert uploaded["size_bytes"] == len(payload)
+    assert uploaded["sha256"] == hashlib.sha256(payload).hexdigest()
+
+    download = client.get(f"/v1/files/{uploaded['file_id']}", headers=headers)
+    assert download.status_code == 200
+    assert download.content == payload
+    assert download.headers["content-type"].startswith("text/plain")
+
+
+def test_files_endpoints_require_scope() -> None:
+    client = TestClient(create_app())
+    scoped_headers = _issue_bearer_headers(client, scopes=["messages:read", "messages:write"])
+
+    upload_denied = client.post(
+        "/v1/files",
+        files={"file": ("hello.txt", b"hello", "text/plain")},
+        headers=scoped_headers,
+    )
+    assert upload_denied.status_code == 403
+
+    full_headers = _issue_bearer_headers(client)
+    uploaded = client.post(
+        "/v1/files",
+        files={"file": ("hello.txt", b"hello", "text/plain")},
+        headers=full_headers,
+    )
+    assert uploaded.status_code == 201
+
+    download_denied = client.get(
+        f"/v1/files/{uploaded.json()['file_id']}",
+        headers=scoped_headers,
+    )
+    assert download_denied.status_code == 403
+
+
+def test_file_upload_rejects_payload_over_max_size(monkeypatch) -> None:
+    monkeypatch.setenv("OPEN_MESSENGER_MAX_UPLOAD_MB", "1")
+    client = TestClient(create_app())
+    headers = _issue_bearer_headers(client)
+
+    too_large = b"a" * (1024 * 1024 + 1)
+    response = client.post(
+        "/v1/files",
+        files={"file": ("big.bin", too_large, "application/octet-stream")},
+        headers=headers,
+    )
+
+    assert response.status_code == 413
+    payload = response.json()
+    assert payload["code"] == "file_too_large"

@@ -14,6 +14,7 @@ class InMemoryMySQLMetadataStore(MySQLMetadataStore):
         self._channels: dict[str, str] = {}
         self._threads: dict[str, str] = {}
         self._messages: dict[str, dict[str, object]] = {}
+        self._files: dict[str, str] = {}
         self._schema_initialized = True
         self._sequence_id = 0
 
@@ -66,6 +67,10 @@ class InMemoryMySQLMetadataStore(MySQLMetadataStore):
                 existing["channel_id"] = str(channel_id)
                 existing["payload"] = str(payload)
             return 1
+        if "insert into" in normalized and self._table("files") in normalized:
+            entity_id, payload = params
+            self._files[str(entity_id)] = str(payload)
+            return 1
         return 0
 
     def _run_fetchone_sync(self, sql: str, params=()):
@@ -87,17 +92,49 @@ class InMemoryMySQLMetadataStore(MySQLMetadataStore):
             entity_id = str(params[0])
             payload = self._threads.get(entity_id)
             return {"payload": payload} if payload is not None else None
-        if "from" in normalized and self._table("messages") in normalized and "message_id=%s" in normalized and "channel_id=%s" not in normalized:
+        if (
+            "from" in normalized
+            and self._table("messages") in normalized
+            and "idempotency_key" in normalized
+        ):
+            channel_id = str(params[0])
+            idempotency_key = str(params[1])
+            thread_id = params[2]
+            ordered = sorted(self._messages.values(), key=lambda item: int(item["sequence_id"]))
+            for row in ordered:
+                if str(row["channel_id"]) != channel_id:
+                    continue
+                payload = json.loads(str(row["payload"]))
+                if payload.get("idempotency_key") != idempotency_key:
+                    continue
+                if payload.get("thread_id") != thread_id:
+                    continue
+                return {"payload": row["payload"]}
+            return None
+        if (
+            "from" in normalized
+            and self._table("messages") in normalized
+            and "message_id=%s" in normalized
+            and "channel_id=%s" not in normalized
+        ):
             message_id = str(params[0])
             row = self._messages.get(message_id)
             return {"payload": row["payload"]} if row is not None else None
-        if "from" in normalized and self._table("messages") in normalized and "channel_id=%s and message_id=%s" in normalized:
+        if (
+            "from" in normalized
+            and self._table("messages") in normalized
+            and "channel_id=%s and message_id=%s" in normalized
+        ):
             channel_id = str(params[0])
             message_id = str(params[1])
             row = self._messages.get(message_id)
             if row is None or str(row["channel_id"]) != channel_id:
                 return None
             return {"sequence_id": int(row["sequence_id"])}
+        if "from" in normalized and self._table("files") in normalized:
+            entity_id = str(params[0])
+            payload = self._files.get(entity_id)
+            return {"payload": payload} if payload is not None else None
         return None
 
     def _run_fetchall_sync(self, sql: str, params=()):
@@ -240,6 +277,35 @@ def test_mysql_metadata_store_contract_with_in_memory_backend() -> None:
     ]
     assert page2 == [{"message_id": "msg-3", "channel_id": "channel-a", "content_ref": "content-3"}]
     assert asyncio.run(store.get_message(m1["message_id"])) == m1
+
+    asyncio.run(
+        store.create_message(
+            {
+                "message_id": "msg-idemp",
+                "channel_id": "channel-b",
+                "thread_id": None,
+                "content_ref": "content-idemp",
+                "idempotency_key": "req-1",
+            }
+        )
+    )
+    found = asyncio.run(store.find_message_by_idempotency("channel-b", None, "req-1"))
+    assert found is not None
+    assert found["message_id"] == "msg-idemp"
+
+    created_file = asyncio.run(
+        store.create_file(
+            {
+                "file_id": "fil-1",
+                "filename": "hello.txt",
+                "mime_type": "text/plain",
+                "size_bytes": 5,
+                "storage_path": "/tmp/hello.txt",
+                "sha256": "abc123",
+            }
+        )
+    )
+    assert asyncio.run(store.get_file("fil-1")) == created_file
 
 
 def test_mysql_metadata_store_serialization_roundtrip() -> None:

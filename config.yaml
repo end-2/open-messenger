@@ -8,6 +8,8 @@ profiles:
     redis_content_key_prefix: open_messenger:content
     mysql_dsn: mysql+pymysql://app:app@localhost:3306/open_messenger
     mysql_table_prefix: open_messenger
+    files_root_dir: data/files
+    max_upload_mb: 50
     admin_api_token: dev-admin-token
     token_signing_secret: dev-signing-secret
   staging:
@@ -19,6 +21,8 @@ profiles:
     redis_content_key_prefix: open_messenger:content
     mysql_dsn: mysql+pymysql://app:app@mysql:3306/open_messenger
     mysql_table_prefix: open_messenger
+    files_root_dir: data/files
+    max_upload_mb: 50
     admin_api_token: change-me-staging
     token_signing_secret: change-me-staging-signing-secret
   prod:
@@ -30,5 +34,7 @@ profiles:
     redis_content_key_prefix: open_messenger:content
     mysql_dsn: mysql+pymysql://app:app@mysql:3306/open_messenger
     mysql_table_prefix: open_messenger
+    files_root_dir: data/files
+    max_upload_mb: 50
     admin_api_token: change-me-prod
     token_signing_secret: change-me-prod-signing-secret
