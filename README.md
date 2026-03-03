@@ -69,3 +69,6 @@ After `make run` or `make up`:
 curl http://localhost:8000/healthz
 curl http://localhost:8000/v1/info
 ```
+
+`/v1/info` reports the configured backend names and selected store implementation classes.
+Currently, `memory` backends are implemented and non-memory backends use explicit not-yet-implemented placeholders.

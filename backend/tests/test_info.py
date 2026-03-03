@@ -3,6 +3,16 @@ from fastapi.testclient import TestClient
 from app.main import create_app
 
 
+def test_info_reports_memory_store_implementations_by_default() -> None:
+    client = TestClient(create_app())
+
+    response = client.get("/v1/info")
+
+    assert response.status_code == 200
+    assert response.json()["content_store_impl"] == "InMemoryMessageContentStore"
+    assert response.json()["metadata_store_impl"] == "InMemoryMetadataStore"
+
+
 def test_info_uses_environment_configuration(monkeypatch) -> None:
     monkeypatch.setenv("OPEN_MESSENGER_ENVIRONMENT", "test")
     monkeypatch.setenv("OPEN_MESSENGER_CONTENT_BACKEND", "file")
@@ -19,4 +29,6 @@ def test_info_uses_environment_configuration(monkeypatch) -> None:
         "environment": "test",
         "content_backend": "file",
         "metadata_backend": "mysql",
+        "content_store_impl": "UnsupportedMessageContentStore",
+        "metadata_store_impl": "UnsupportedMetadataStore",
     }

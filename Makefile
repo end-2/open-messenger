@@ -33,7 +33,7 @@ test: install
 	PYTHONPATH=backend $(PYTEST) -q backend/tests
 
 test-docker:
-	docker compose --profile test run --rm test
+	docker compose --profile test run --rm --build test
 
 test-frontend-docker:
 	docker run --rm -v "$$PWD":/workspace -w /workspace node:22-alpine node --test frontend/src/index.test.js

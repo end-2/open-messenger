@@ -19,15 +19,15 @@
 
 ## 3. 저장소 추상화 계층
 
-- [ ] `MessageContentStore` 인터페이스 정의 (`put/get/delete`)
-- [ ] `MetadataStore` 인터페이스 정의 (`create/get/list`)
-- [ ] 메시지 저장소 구현: `memory`
+- [x] `MessageContentStore` 인터페이스 정의 (`put/get/delete`)
+- [x] `MetadataStore` 인터페이스 정의 (`create/get/list`)
+- [x] 메시지 저장소 구현: `memory`
 - [ ] 메시지 저장소 구현: `file`
 - [ ] 메시지 저장소 구현: `redis`
-- [ ] 메타데이터 저장소 구현: `memory`
+- [x] 메타데이터 저장소 구현: `memory`
 - [ ] 메타데이터 저장소 구현: `file`
 - [ ] 메타데이터 저장소 구현: `mysql`
-- [ ] 런타임 설정 기반 백엔드 선택 로더 구현 (`message_content_backend`, `metadata_backend`)
+- [x] 런타임 설정 기반 백엔드 선택 로더 구현 (`message_content_backend`, `metadata_backend`)
 
 ## 4. 인증/인가
 
