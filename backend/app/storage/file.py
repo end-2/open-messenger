@@ -56,6 +56,25 @@ class FileMetadataStore(MetadataStore):
         self._lock = Lock()
         self._initialize()
 
+    async def create_channel(self, channel: dict[str, Any]) -> dict[str, Any]:
+        channel_id = str(channel["channel_id"])
+        record = deepcopy(channel)
+
+        with self._lock:
+            database = self._read_database()
+            database["channels"][channel_id] = record
+            database["channel_index"].setdefault(channel_id, [])
+            self._write_database(database)
+        return deepcopy(record)
+
+    async def get_channel(self, channel_id: str) -> dict[str, Any] | None:
+        with self._lock:
+            database = self._read_database()
+            record = database["channels"].get(channel_id)
+        if record is None:
+            return None
+        return deepcopy(record)
+
     async def create_message(self, msg: dict[str, Any]) -> dict[str, Any]:
         message_id = str(msg["message_id"])
         channel_id = str(msg["channel_id"])
@@ -95,17 +114,6 @@ class FileMetadataStore(MetadataStore):
             selected_ids = message_ids[start_idx : start_idx + max(limit, 0)]
             records = [deepcopy(database["messages"][msg_id]) for msg_id in selected_ids]
         return records
-
-    async def create_channel(self, channel: dict[str, Any]) -> dict[str, Any]:
-        channel_id = str(channel["channel_id"])
-        record = deepcopy(channel)
-
-        with self._lock:
-            database = self._read_database()
-            database["channels"][channel_id] = record
-            database["channel_index"].setdefault(channel_id, [])
-            self._write_database(database)
-        return deepcopy(record)
 
     def _initialize(self) -> None:
         if self._db_path.exists():

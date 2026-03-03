@@ -26,6 +26,10 @@ def test_file_metadata_store_persists_and_paginates(tmp_path) -> None:
     store = FileMetadataStore(db_path)
 
     asyncio.run(store.create_channel({"channel_id": "channel-a", "name": "general"}))
+    assert asyncio.run(store.get_channel("channel-a")) == {
+        "channel_id": "channel-a",
+        "name": "general",
+    }
 
     m1 = asyncio.run(
         store.create_message(
@@ -70,4 +74,8 @@ def test_file_metadata_store_persists_and_paginates(tmp_path) -> None:
     ]
 
     reloaded_store = FileMetadataStore(db_path)
+    assert asyncio.run(reloaded_store.get_channel("channel-a")) == {
+        "channel_id": "channel-a",
+        "name": "general",
+    }
     assert asyncio.run(reloaded_store.get_message(m1["message_id"])) == m1

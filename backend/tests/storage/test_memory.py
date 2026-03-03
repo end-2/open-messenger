@@ -25,6 +25,10 @@ def test_in_memory_metadata_store_message_pagination() -> None:
     store = InMemoryMetadataStore()
 
     asyncio.run(store.create_channel({"channel_id": "channel-a", "name": "general"}))
+    assert asyncio.run(store.get_channel("channel-a")) == {
+        "channel_id": "channel-a",
+        "name": "general",
+    }
 
     m1 = asyncio.run(
         store.create_message(

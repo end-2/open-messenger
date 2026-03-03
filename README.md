@@ -70,6 +70,20 @@ curl http://localhost:8000/healthz
 curl http://localhost:8000/v1/info
 ```
 
+Create and query a channel:
+
+```bash
+curl -X POST http://localhost:8000/v1/channels -H "Content-Type: application/json" -d '{"name":"general"}'
+curl http://localhost:8000/v1/channels/<channel_id>
+```
+
+Create and query messages:
+
+```bash
+curl -X POST http://localhost:8000/v1/channels/<channel_id>/messages -H "Content-Type: application/json" -d '{"text":"hello"}'
+curl "http://localhost:8000/v1/channels/<channel_id>/messages?limit=20"
+```
+
 `/v1/info` reports the configured backend names and selected store implementation classes.
 Currently, `memory` and `file` backends are implemented. `redis` and `mysql` remain placeholders.
 

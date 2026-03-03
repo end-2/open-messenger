@@ -36,6 +36,12 @@ class UnsupportedMetadataStore(MetadataStore):
     def __init__(self, backend_name: str) -> None:
         self.backend_name = backend_name
 
+    async def create_channel(self, channel: dict[str, Any]) -> dict[str, Any]:
+        self._raise_not_supported()
+
+    async def get_channel(self, channel_id: str) -> dict[str, Any] | None:
+        self._raise_not_supported()
+
     async def create_message(self, msg: dict[str, Any]) -> dict[str, Any]:
         self._raise_not_supported()
 
@@ -48,9 +54,6 @@ class UnsupportedMetadataStore(MetadataStore):
         cursor: str | None,
         limit: int,
     ) -> list[dict[str, Any]]:
-        self._raise_not_supported()
-
-    async def create_channel(self, channel: dict[str, Any]) -> dict[str, Any]:
         self._raise_not_supported()
 
     def _raise_not_supported(self) -> None:

@@ -33,6 +33,19 @@ class InMemoryMetadataStore(MetadataStore):
         self._messages: dict[str, dict[str, Any]] = {}
         self._channel_index: dict[str, list[str]] = {}
 
+    async def create_channel(self, channel: dict[str, Any]) -> dict[str, Any]:
+        channel_id = str(channel["channel_id"])
+        record = deepcopy(channel)
+        self._channels[channel_id] = record
+        self._channel_index.setdefault(channel_id, [])
+        return deepcopy(record)
+
+    async def get_channel(self, channel_id: str) -> dict[str, Any] | None:
+        channel = self._channels.get(channel_id)
+        if channel is None:
+            return None
+        return deepcopy(channel)
+
     async def create_message(self, msg: dict[str, Any]) -> dict[str, Any]:
         message_id = str(msg["message_id"])
         channel_id = str(msg["channel_id"])
@@ -65,10 +78,3 @@ class InMemoryMetadataStore(MetadataStore):
 
         selected_ids = message_ids[start_idx : start_idx + max(limit, 0)]
         return [deepcopy(self._messages[msg_id]) for msg_id in selected_ids]
-
-    async def create_channel(self, channel: dict[str, Any]) -> dict[str, Any]:
-        channel_id = str(channel["channel_id"])
-        record = deepcopy(channel)
-        self._channels[channel_id] = record
-        self._channel_index.setdefault(channel_id, [])
-        return deepcopy(record)
