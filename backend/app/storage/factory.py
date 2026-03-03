@@ -36,6 +36,21 @@ class UnsupportedMetadataStore(MetadataStore):
     def __init__(self, backend_name: str) -> None:
         self.backend_name = backend_name
 
+    async def create_user(self, user: dict[str, Any]) -> dict[str, Any]:
+        self._raise_not_supported()
+
+    async def get_user(self, user_id: str) -> dict[str, Any] | None:
+        self._raise_not_supported()
+
+    async def create_token(self, token: dict[str, Any]) -> dict[str, Any]:
+        self._raise_not_supported()
+
+    async def get_token(self, token_id: str) -> dict[str, Any] | None:
+        self._raise_not_supported()
+
+    async def update_token(self, token_id: str, patch: dict[str, Any]) -> dict[str, Any] | None:
+        self._raise_not_supported()
+
     async def create_channel(self, channel: dict[str, Any]) -> dict[str, Any]:
         self._raise_not_supported()
 

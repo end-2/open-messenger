@@ -56,6 +56,53 @@ class FileMetadataStore(MetadataStore):
         self._lock = Lock()
         self._initialize()
 
+    async def create_user(self, user: dict[str, Any]) -> dict[str, Any]:
+        user_id = str(user["user_id"])
+        record = deepcopy(user)
+
+        with self._lock:
+            database = self._read_database()
+            database["users"][user_id] = record
+            self._write_database(database)
+        return deepcopy(record)
+
+    async def get_user(self, user_id: str) -> dict[str, Any] | None:
+        with self._lock:
+            database = self._read_database()
+            record = database["users"].get(user_id)
+        if record is None:
+            return None
+        return deepcopy(record)
+
+    async def create_token(self, token: dict[str, Any]) -> dict[str, Any]:
+        token_id = str(token["token_id"])
+        record = deepcopy(token)
+
+        with self._lock:
+            database = self._read_database()
+            database["tokens"][token_id] = record
+            self._write_database(database)
+        return deepcopy(record)
+
+    async def get_token(self, token_id: str) -> dict[str, Any] | None:
+        with self._lock:
+            database = self._read_database()
+            record = database["tokens"].get(token_id)
+        if record is None:
+            return None
+        return deepcopy(record)
+
+    async def update_token(self, token_id: str, patch: dict[str, Any]) -> dict[str, Any] | None:
+        with self._lock:
+            database = self._read_database()
+            record = database["tokens"].get(token_id)
+            if record is None:
+                return None
+            record.update(deepcopy(patch))
+            database["tokens"][token_id] = record
+            self._write_database(database)
+        return deepcopy(record)
+
     async def create_channel(self, channel: dict[str, Any]) -> dict[str, Any]:
         channel_id = str(channel["channel_id"])
         record = deepcopy(channel)
@@ -148,6 +195,8 @@ class FileMetadataStore(MetadataStore):
         if self._db_path.exists():
             return
         empty_db: dict[str, Any] = {
+            "users": {},
+            "tokens": {},
             "channels": {},
             "threads": {},
             "messages": {},
@@ -158,6 +207,8 @@ class FileMetadataStore(MetadataStore):
     def _read_database(self) -> dict[str, Any]:
         with self._db_path.open("r", encoding="utf-8") as fp:
             database = json.load(fp)
+        database.setdefault("users", {})
+        database.setdefault("tokens", {})
         database.setdefault("channels", {})
         database.setdefault("threads", {})
         database.setdefault("messages", {})

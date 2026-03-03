@@ -24,6 +24,38 @@ def test_in_memory_message_content_store_crud() -> None:
 def test_in_memory_metadata_store_message_pagination() -> None:
     store = InMemoryMetadataStore()
 
+    user = asyncio.run(
+        store.create_user(
+            {
+                "user_id": "usr-1",
+                "username": "alice",
+                "display_name": "Alice",
+                "created_at": "2026-03-03T00:00:00+00:00",
+            }
+        )
+    )
+    assert asyncio.run(store.get_user("usr-1")) == user
+
+    token = asyncio.run(
+        store.create_token(
+            {
+                "token_id": "tok-1",
+                "user_id": "usr-1",
+                "token_type": "user_token",
+                "scopes": ["messages:write"],
+                "token_hash": "hash-1",
+                "created_at": "2026-03-03T00:00:00+00:00",
+                "revoked_at": None,
+            }
+        )
+    )
+    assert asyncio.run(store.get_token("tok-1")) == token
+    updated_token = asyncio.run(
+        store.update_token("tok-1", {"revoked_at": "2026-03-03T01:00:00+00:00"})
+    )
+    assert updated_token is not None
+    assert updated_token["revoked_at"] == "2026-03-03T01:00:00+00:00"
+
     asyncio.run(store.create_channel({"channel_id": "channel-a", "name": "general"}))
     assert asyncio.run(store.get_channel("channel-a")) == {
         "channel_id": "channel-a",

@@ -29,10 +29,43 @@ class InMemoryMetadataStore(MetadataStore):
     """In-memory implementation for metadata entities."""
 
     def __init__(self) -> None:
+        self._users: dict[str, dict[str, Any]] = {}
+        self._tokens: dict[str, dict[str, Any]] = {}
         self._channels: dict[str, dict[str, Any]] = {}
         self._threads: dict[str, dict[str, Any]] = {}
         self._messages: dict[str, dict[str, Any]] = {}
         self._channel_index: dict[str, list[str]] = {}
+
+    async def create_user(self, user: dict[str, Any]) -> dict[str, Any]:
+        user_id = str(user["user_id"])
+        record = deepcopy(user)
+        self._users[user_id] = record
+        return deepcopy(record)
+
+    async def get_user(self, user_id: str) -> dict[str, Any] | None:
+        user = self._users.get(user_id)
+        if user is None:
+            return None
+        return deepcopy(user)
+
+    async def create_token(self, token: dict[str, Any]) -> dict[str, Any]:
+        token_id = str(token["token_id"])
+        record = deepcopy(token)
+        self._tokens[token_id] = record
+        return deepcopy(record)
+
+    async def get_token(self, token_id: str) -> dict[str, Any] | None:
+        token = self._tokens.get(token_id)
+        if token is None:
+            return None
+        return deepcopy(token)
+
+    async def update_token(self, token_id: str, patch: dict[str, Any]) -> dict[str, Any] | None:
+        token = self._tokens.get(token_id)
+        if token is None:
+            return None
+        token.update(deepcopy(patch))
+        return deepcopy(token)
 
     async def create_channel(self, channel: dict[str, Any]) -> dict[str, Any]:
         channel_id = str(channel["channel_id"])

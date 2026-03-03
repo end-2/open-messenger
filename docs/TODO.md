@@ -32,10 +32,10 @@
 ## 4. 인증/인가
 
 - [ ] `Authorization: Bearer <token>` 파서 및 미들웨어 구현
-- [ ] 토큰 해시 저장(`sha256`) 및 평문 1회 노출 정책 구현
+- [x] 토큰 해시 저장(`sha256`) 및 평문 1회 노출 정책 구현
 - [ ] 토큰 스코프 검사 구현 (`channels:*`, `messages:*`, `files:*`)
 - [ ] 토큰 회전(rotation) API 구현
-- [ ] 토큰 폐기(revoke) API 구현
+- [x] 토큰 폐기(revoke) API 구현
 - [ ] 기본 rate limit 적용
 
 ## 5. Native API (`/v1`)
@@ -54,9 +54,9 @@
 
 ## 6. Admin API (`/admin/v1`)
 
-- [ ] `POST /admin/v1/users` (사용자 생성)
-- [ ] `POST /admin/v1/tokens` (토큰 생성)
-- [ ] `DELETE /admin/v1/tokens/{token_id}` (토큰 폐기)
+- [x] `POST /admin/v1/users` (사용자 생성)
+- [x] `POST /admin/v1/tokens` (토큰 생성)
+- [x] `DELETE /admin/v1/tokens/{token_id}` (토큰 폐기)
 - [ ] `/v1` 경로에서 user/token 생성 차단 검증
 - [ ] 관리자 경로 접근 제어 및 감사 로그 추가
 

@@ -54,3 +54,10 @@ def test_build_storage_registry_returns_unsupported_placeholders() -> None:
                 {"thread_id": "th-1", "channel_id": "channel-a", "root_message_id": "msg-1"}
             )
         )
+
+    with pytest.raises(NotImplementedError):
+        asyncio.run(
+            metadata_store.create_user(
+                {"user_id": "usr-1", "username": "alice", "created_at": "2026-03-03T00:00:00+00:00"}
+            )
+        )

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import hashlib
+import secrets
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, Field
 
 from app.config import Settings, get_settings
@@ -68,12 +70,47 @@ class ListMessagesResponse(BaseModel):
     next_cursor: Optional[str]
 
 
+class CreateUserRequest(BaseModel):
+    username: str = Field(min_length=1, max_length=64)
+    display_name: Optional[str] = Field(default=None, max_length=100)
+
+
+class UserResponse(BaseModel):
+    user_id: str
+    username: str
+    display_name: Optional[str]
+    created_at: str
+
+
+class CreateTokenRequest(BaseModel):
+    user_id: str = Field(min_length=1)
+    token_type: Literal["user_token", "bot_token", "service_token"] = "user_token"
+    scopes: list[str] = Field(default_factory=list)
+
+
+class TokenResponse(BaseModel):
+    token_id: str
+    user_id: str
+    token_type: str
+    scopes: list[str]
+    created_at: str
+    revoked_at: Optional[str]
+
+
+class CreateTokenResponse(TokenResponse):
+    token: str
+
+
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
 def _new_id(prefix: str) -> str:
     return f"{prefix}_{uuid4().hex}"
+
+
+def _sha256(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
 def _build_message_response(
@@ -346,3 +383,75 @@ async def create_thread_message(
     )
     await _increment_thread_reply(metadata_store, thread_id, occurred_at)
     return response
+
+
+@router.post(
+    "/admin/v1/users",
+    response_model=UserResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_admin_user(
+    payload: CreateUserRequest,
+    request: Request,
+) -> dict[str, Any]:
+    metadata_store = request.app.state.metadata_store
+    user = {
+        "user_id": _new_id("usr"),
+        "username": payload.username,
+        "display_name": payload.display_name,
+        "created_at": _utc_now_iso(),
+    }
+    return await metadata_store.create_user(user)
+
+
+@router.post(
+    "/admin/v1/tokens",
+    response_model=CreateTokenResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_admin_token(
+    payload: CreateTokenRequest,
+    request: Request,
+) -> dict[str, Any]:
+    metadata_store = request.app.state.metadata_store
+    user = await metadata_store.get_user(payload.user_id)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    plain_token = secrets.token_urlsafe(32)
+    now = _utc_now_iso()
+    token_record = {
+        "token_id": _new_id("tok"),
+        "user_id": payload.user_id,
+        "token_type": payload.token_type,
+        "scopes": payload.scopes,
+        "token_hash": _sha256(plain_token),
+        "created_at": now,
+        "revoked_at": None,
+    }
+    stored = await metadata_store.create_token(token_record)
+    return {
+        "token_id": stored["token_id"],
+        "user_id": stored["user_id"],
+        "token_type": stored["token_type"],
+        "scopes": stored["scopes"],
+        "created_at": stored["created_at"],
+        "revoked_at": stored["revoked_at"],
+        "token": plain_token,
+    }
+
+
+@router.delete(
+    "/admin/v1/tokens/{token_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def revoke_admin_token(token_id: str, request: Request) -> Response:
+    metadata_store = request.app.state.metadata_store
+    token = await metadata_store.get_token(token_id)
+    if token is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Token not found")
+
+    if token.get("revoked_at") is None:
+        await metadata_store.update_token(token_id, {"revoked_at": _utc_now_iso()})
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

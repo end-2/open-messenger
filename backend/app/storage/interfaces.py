@@ -19,6 +19,21 @@ class MessageContentStore(Protocol):
 class MetadataStore(Protocol):
     """Stores messaging metadata entities."""
 
+    async def create_user(self, user: dict[str, Any]) -> dict[str, Any]:
+        ...
+
+    async def get_user(self, user_id: str) -> dict[str, Any] | None:
+        ...
+
+    async def create_token(self, token: dict[str, Any]) -> dict[str, Any]:
+        ...
+
+    async def get_token(self, token_id: str) -> dict[str, Any] | None:
+        ...
+
+    async def update_token(self, token_id: str, patch: dict[str, Any]) -> dict[str, Any] | None:
+        ...
+
     async def create_channel(self, channel: dict[str, Any]) -> dict[str, Any]:
         ...
 

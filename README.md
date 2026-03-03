@@ -91,6 +91,16 @@ curl -X POST http://localhost:8000/v1/channels/<channel_id>/threads -H "Content-
 curl -X POST http://localhost:8000/v1/threads/<thread_id>/messages -H "Content-Type: application/json" -d '{"text":"thread reply"}'
 ```
 
+Create an admin user and token:
+
+```bash
+curl -X POST http://localhost:8000/admin/v1/users -H "Content-Type: application/json" -d '{"username":"alice","display_name":"Alice"}'
+curl -X POST http://localhost:8000/admin/v1/tokens -H "Content-Type: application/json" -d '{"user_id":"<user_id>","token_type":"bot_token","scopes":["messages:write"]}'
+curl -X DELETE http://localhost:8000/admin/v1/tokens/<token_id>
+```
+
+Tokens are persisted as SHA-256 hashes; the plaintext token is returned only once at creation time.
+
 `/v1/info` reports the configured backend names and selected store implementation classes.
 Currently, `memory` and `file` backends are implemented. `redis` and `mysql` remain placeholders.
 
