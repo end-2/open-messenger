@@ -4,13 +4,16 @@ profiles:
     content_backend: memory
     metadata_backend: memory
     storage_dir: data/storage
+    admin_api_token: dev-admin-token
   staging:
     environment: staging
     content_backend: file
     metadata_backend: file
     storage_dir: data/storage
+    admin_api_token: change-me-staging
   prod:
     environment: prod
     content_backend: redis
     metadata_backend: mysql
     storage_dir: data/storage
+    admin_api_token: change-me-prod

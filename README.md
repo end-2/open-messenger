@@ -94,12 +94,13 @@ curl -X POST http://localhost:8000/v1/threads/<thread_id>/messages -H "Content-T
 Create an admin user and token:
 
 ```bash
-curl -X POST http://localhost:8000/admin/v1/users -H "Content-Type: application/json" -d '{"username":"alice","display_name":"Alice"}'
-curl -X POST http://localhost:8000/admin/v1/tokens -H "Content-Type: application/json" -d '{"user_id":"<user_id>","token_type":"bot_token","scopes":["messages:write"]}'
-curl -X DELETE http://localhost:8000/admin/v1/tokens/<token_id>
+curl -X POST http://localhost:8000/admin/v1/users -H "Content-Type: application/json" -H "X-Admin-Token: dev-admin-token" -d '{"username":"alice","display_name":"Alice"}'
+curl -X POST http://localhost:8000/admin/v1/tokens -H "Content-Type: application/json" -H "X-Admin-Token: dev-admin-token" -d '{"user_id":"<user_id>","token_type":"bot_token","scopes":["messages:write"]}'
+curl -X DELETE http://localhost:8000/admin/v1/tokens/<token_id> -H "X-Admin-Token: dev-admin-token"
 ```
 
 Tokens are persisted as SHA-256 hashes; the plaintext token is returned only once at creation time.
+Admin endpoints require `X-Admin-Token` that matches `OPEN_MESSENGER_ADMIN_API_TOKEN`.
 
 `/v1/info` reports the configured backend names and selected store implementation classes.
 Currently, `memory` and `file` backends are implemented. `redis` and `mysql` remain placeholders.
@@ -109,3 +110,4 @@ Currently, `memory` and `file` backends are implemented. `redis` and `mysql` rem
 - `OPEN_MESSENGER_CONTENT_BACKEND`: `memory | file | redis`
 - `OPEN_MESSENGER_METADATA_BACKEND`: `memory | file | mysql`
 - `OPEN_MESSENGER_STORAGE_DIR`: filesystem root used by `file` backends
+- `OPEN_MESSENGER_ADMIN_API_TOKEN`: required value for `X-Admin-Token` on `/admin/v1/*`

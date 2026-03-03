@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import secrets
 from datetime import datetime, timezone
 from typing import Any, Literal, Optional
@@ -12,6 +13,7 @@ from pydantic import BaseModel, Field
 from app.config import Settings, get_settings
 
 router = APIRouter()
+audit_logger = logging.getLogger("open_messenger.audit")
 
 
 class CreateChannelRequest(BaseModel):
@@ -111,6 +113,22 @@ def _new_id(prefix: str) -> str:
 
 def _sha256(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+async def require_admin_access(
+    request: Request,
+    settings: Settings = Depends(get_settings),
+) -> None:
+    presented_token = request.headers.get("x-admin-token")
+    expected_token = settings.admin_api_token
+
+    if not presented_token or not secrets.compare_digest(presented_token, expected_token):
+        audit_logger.warning(
+            "admin_access_denied path=%s method=%s",
+            request.url.path,
+            request.method,
+        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access denied")
 
 
 def _build_message_response(
@@ -393,6 +411,7 @@ async def create_thread_message(
 async def create_admin_user(
     payload: CreateUserRequest,
     request: Request,
+    _: None = Depends(require_admin_access),
 ) -> dict[str, Any]:
     metadata_store = request.app.state.metadata_store
     user = {
@@ -401,7 +420,9 @@ async def create_admin_user(
         "display_name": payload.display_name,
         "created_at": _utc_now_iso(),
     }
-    return await metadata_store.create_user(user)
+    created = await metadata_store.create_user(user)
+    audit_logger.info("admin_user_created user_id=%s username=%s", created["user_id"], created["username"])
+    return created
 
 
 @router.post(
@@ -412,6 +433,7 @@ async def create_admin_user(
 async def create_admin_token(
     payload: CreateTokenRequest,
     request: Request,
+    _: None = Depends(require_admin_access),
 ) -> dict[str, Any]:
     metadata_store = request.app.state.metadata_store
     user = await metadata_store.get_user(payload.user_id)
@@ -430,6 +452,13 @@ async def create_admin_token(
         "revoked_at": None,
     }
     stored = await metadata_store.create_token(token_record)
+    audit_logger.info(
+        "admin_token_created token_id=%s user_id=%s token_type=%s scopes=%d",
+        stored["token_id"],
+        stored["user_id"],
+        stored["token_type"],
+        len(stored["scopes"]),
+    )
     return {
         "token_id": stored["token_id"],
         "user_id": stored["user_id"],
@@ -445,7 +474,11 @@ async def create_admin_token(
     "/admin/v1/tokens/{token_id}",
     status_code=status.HTTP_204_NO_CONTENT,
 )
-async def revoke_admin_token(token_id: str, request: Request) -> Response:
+async def revoke_admin_token(
+    token_id: str,
+    request: Request,
+    _: None = Depends(require_admin_access),
+) -> Response:
     metadata_store = request.app.state.metadata_store
     token = await metadata_store.get_token(token_id)
     if token is None:
@@ -453,5 +486,8 @@ async def revoke_admin_token(token_id: str, request: Request) -> Response:
 
     if token.get("revoked_at") is None:
         await metadata_store.update_token(token_id, {"revoked_at": _utc_now_iso()})
+        audit_logger.info("admin_token_revoked token_id=%s", token_id)
+    else:
+        audit_logger.info("admin_token_revoke_noop token_id=%s", token_id)
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)

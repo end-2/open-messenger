@@ -57,8 +57,8 @@
 - [x] `POST /admin/v1/users` (사용자 생성)
 - [x] `POST /admin/v1/tokens` (토큰 생성)
 - [x] `DELETE /admin/v1/tokens/{token_id}` (토큰 폐기)
-- [ ] `/v1` 경로에서 user/token 생성 차단 검증
-- [ ] 관리자 경로 접근 제어 및 감사 로그 추가
+- [x] `/v1` 경로에서 user/token 생성 차단 검증
+- [x] 관리자 경로 접근 제어 및 감사 로그 추가
 
 ## 7. Compatibility API
 
