@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     environment: Literal["dev", "staging", "prod", "test"] = "dev"
     content_backend: Literal["memory", "file", "redis"] = "memory"
     metadata_backend: Literal["memory", "file", "mysql"] = "memory"
+    storage_dir: str = "data/storage"
 
     model_config = SettingsConfigDict(
         env_file=".env",

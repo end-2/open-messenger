@@ -71,4 +71,10 @@ curl http://localhost:8000/v1/info
 ```
 
 `/v1/info` reports the configured backend names and selected store implementation classes.
-Currently, `memory` backends are implemented and non-memory backends use explicit not-yet-implemented placeholders.
+Currently, `memory` and `file` backends are implemented. `redis` and `mysql` remain placeholders.
+
+## Storage Configuration
+
+- `OPEN_MESSENGER_CONTENT_BACKEND`: `memory | file | redis`
+- `OPEN_MESSENGER_METADATA_BACKEND`: `memory | file | mysql`
+- `OPEN_MESSENGER_STORAGE_DIR`: filesystem root used by `file` backends

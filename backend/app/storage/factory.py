@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from app.config import Settings
+from app.storage.file import FileMessageContentStore, FileMetadataStore
 from app.storage.interfaces import MessageContentStore, MetadataStore
 from app.storage.memory import InMemoryMessageContentStore, InMemoryMetadataStore
 
@@ -60,16 +62,22 @@ class UnsupportedMetadataStore(MetadataStore):
 def build_storage_registry(settings: Settings) -> tuple[MessageContentStore, MetadataStore]:
     """Build store instances selected by runtime configuration."""
 
+    storage_root = Path(settings.storage_dir)
+
     content_store: MessageContentStore
     metadata_store: MetadataStore
 
     if settings.content_backend == "memory":
         content_store = InMemoryMessageContentStore()
+    elif settings.content_backend == "file":
+        content_store = FileMessageContentStore(storage_root / "content")
     else:
         content_store = UnsupportedMessageContentStore(settings.content_backend)
 
     if settings.metadata_backend == "memory":
         metadata_store = InMemoryMetadataStore()
+    elif settings.metadata_backend == "file":
+        metadata_store = FileMetadataStore(storage_root / "metadata.json")
     else:
         metadata_store = UnsupportedMetadataStore(settings.metadata_backend)
 

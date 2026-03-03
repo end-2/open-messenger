@@ -11,6 +11,9 @@ This document describes reproducible setup and test execution for the current sc
 3. Run the API server:
    - `make run`
 
+Optional: run with file-backed storage:
+- `OPEN_MESSENGER_CONTENT_BACKEND=file OPEN_MESSENGER_METADATA_BACKEND=file OPEN_MESSENGER_STORAGE_DIR=data/storage make run`
+
 ## Docker Environment
 
 1. Start deployment test stack:

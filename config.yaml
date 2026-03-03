@@ -3,11 +3,14 @@ profiles:
     environment: dev
     content_backend: memory
     metadata_backend: memory
+    storage_dir: data/storage
   staging:
     environment: staging
     content_backend: file
     metadata_backend: file
+    storage_dir: data/storage
   prod:
     environment: prod
     content_backend: redis
     metadata_backend: mysql
+    storage_dir: data/storage

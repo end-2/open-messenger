@@ -3,6 +3,7 @@ import asyncio
 import pytest
 
 from app.config import Settings
+from app.storage.file import FileMessageContentStore, FileMetadataStore
 from app.storage.factory import (
     UnsupportedMessageContentStore,
     UnsupportedMetadataStore,
@@ -18,6 +19,19 @@ def test_build_storage_registry_selects_memory_implementations() -> None:
 
     assert isinstance(content_store, InMemoryMessageContentStore)
     assert isinstance(metadata_store, InMemoryMetadataStore)
+
+
+def test_build_storage_registry_selects_file_implementations(tmp_path) -> None:
+    settings = Settings(
+        content_backend="file",
+        metadata_backend="file",
+        storage_dir=str(tmp_path),
+    )
+
+    content_store, metadata_store = build_storage_registry(settings)
+
+    assert isinstance(content_store, FileMessageContentStore)
+    assert isinstance(metadata_store, FileMetadataStore)
 
 
 def test_build_storage_registry_returns_unsupported_placeholders() -> None:
