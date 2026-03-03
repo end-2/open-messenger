@@ -5,6 +5,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from app.main import create_app
+from app.utils import is_valid_prefixed_ulid, parse_iso8601_utc
 
 
 DEFAULT_NATIVE_SCOPES = [
@@ -46,7 +47,8 @@ def _create_channel(client: TestClient, headers: dict[str, str], name: str = "ge
     assert response.status_code == 201
     payload = response.json()
     assert payload["name"] == name
-    assert payload["channel_id"].startswith("ch_")
+    assert is_valid_prefixed_ulid(payload["channel_id"], "ch")
+    assert parse_iso8601_utc(payload["created_at"]).isoformat().endswith("+00:00")
     return payload["channel_id"]
 
 
@@ -101,9 +103,12 @@ def test_post_and_list_channel_messages_with_cursor() -> None:
         )
         assert response.status_code == 201
         payload = response.json()
+        assert is_valid_prefixed_ulid(payload["message_id"], "msg")
         assert payload["channel_id"] == channel_id
         assert payload["text"] == f"message-{index}"
-        assert payload["content_ref"].startswith("cnt_")
+        assert is_valid_prefixed_ulid(payload["content_ref"], "cnt")
+        assert parse_iso8601_utc(payload["created_at"]).isoformat().endswith("+00:00")
+        assert parse_iso8601_utc(payload["updated_at"]).isoformat().endswith("+00:00")
         posted_ids.append(payload["message_id"])
 
     page1 = client.get(
@@ -165,7 +170,9 @@ def test_create_thread_and_post_thread_message() -> None:
     assert thread_payload["channel_id"] == channel_id
     assert thread_payload["root_message_id"] == root_message_id
     assert thread_payload["reply_count"] == 0
-    assert thread_payload["thread_id"].startswith("th_")
+    assert is_valid_prefixed_ulid(thread_payload["thread_id"], "th")
+    assert parse_iso8601_utc(thread_payload["created_at"]).isoformat().endswith("+00:00")
+    assert parse_iso8601_utc(thread_payload["last_message_at"]).isoformat().endswith("+00:00")
 
     reply_response = client.post(
         f"/v1/threads/{thread_payload['thread_id']}/messages",
@@ -174,6 +181,8 @@ def test_create_thread_and_post_thread_message() -> None:
     )
     assert reply_response.status_code == 201
     reply_payload = reply_response.json()
+    assert is_valid_prefixed_ulid(reply_payload["message_id"], "msg")
+    assert is_valid_prefixed_ulid(reply_payload["content_ref"], "cnt")
     assert reply_payload["thread_id"] == thread_payload["thread_id"]
     assert reply_payload["channel_id"] == channel_id
 

@@ -2,15 +2,15 @@ from __future__ import annotations
 
 import logging
 import secrets
-from datetime import datetime, timezone
 from typing import Any, Literal, Optional
-from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, Field
 
 from app.auth import AuthContext, create_jwt_like_token, require_scopes, sha256_hexdigest
 from app.config import Settings, get_settings
+from app.domain import Channel, Message, MessageContent, Thread, Token, User
+from app.utils import new_prefixed_ulid, utc_now_iso8601
 
 router = APIRouter()
 audit_logger = logging.getLogger("open_messenger.audit")
@@ -104,11 +104,11 @@ class CreateTokenResponse(TokenResponse):
 
 
 def _utc_now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return utc_now_iso8601()
 
 
 def _new_id(prefix: str) -> str:
-    return f"{prefix}_{uuid4().hex}"
+    return new_prefixed_ulid(prefix)
 
 
 async def require_admin_access(
@@ -161,28 +161,28 @@ async def _store_message(
 
     resolved_thread_id = force_thread_id if force_thread_id is not None else payload.thread_id
 
-    content_payload = {
-        "text": payload.text,
-        "blocks": payload.blocks,
-        "mentions": payload.mentions,
-        "raw_payload": payload.raw_payload,
-    }
+    content_payload = MessageContent(
+        text=payload.text,
+        blocks=payload.blocks,
+        mentions=payload.mentions,
+        raw_payload=payload.raw_payload,
+    ).to_dict()
     await content_store.put(content_ref, content_payload)
 
-    message_metadata = {
-        "message_id": message_id,
-        "channel_id": channel_id,
-        "thread_id": resolved_thread_id,
-        "sender_user_id": payload.sender_user_id,
-        "content_ref": content_ref,
-        "attachments": payload.attachments,
-        "created_at": now,
-        "updated_at": now,
-        "deleted_at": None,
-        "compat_origin": "native",
-        "idempotency_key": payload.idempotency_key,
-        "metadata": payload.metadata,
-    }
+    message_metadata = Message(
+        message_id=message_id,
+        channel_id=channel_id,
+        thread_id=resolved_thread_id,
+        sender_user_id=payload.sender_user_id,
+        content_ref=content_ref,
+        attachments=payload.attachments,
+        created_at=now,
+        updated_at=now,
+        deleted_at=None,
+        compat_origin="native",
+        idempotency_key=payload.idempotency_key,
+        metadata=payload.metadata,
+    ).to_dict()
     stored_metadata = await metadata_store.create_message(message_metadata)
     return _build_message_response(stored_metadata, content_payload), now
 
@@ -241,11 +241,10 @@ async def create_channel(
     _: AuthContext = Depends(require_scopes(["channels:write"])),
 ) -> dict[str, Any]:
     metadata_store = request.app.state.metadata_store
-    channel = {
-        "channel_id": _new_id("ch"),
-        "name": payload.name,
-        "created_at": _utc_now_iso(),
-    }
+    channel = Channel(
+        channel_id=_new_id("ch"),
+        name=payload.name,
+    ).to_dict()
     return await metadata_store.create_channel(channel)
 
 
@@ -361,14 +360,14 @@ async def create_channel_thread(
         )
 
     now = _utc_now_iso()
-    thread = {
-        "thread_id": _new_id("th"),
-        "channel_id": channel_id,
-        "root_message_id": payload.root_message_id,
-        "reply_count": 0,
-        "last_message_at": str(root_message.get("created_at", now)),
-        "created_at": now,
-    }
+    thread = Thread(
+        thread_id=_new_id("th"),
+        channel_id=channel_id,
+        root_message_id=payload.root_message_id,
+        reply_count=0,
+        last_message_at=str(root_message.get("created_at", now)),
+        created_at=now,
+    ).to_dict()
     return await metadata_store.create_thread(thread)
 
 
@@ -419,12 +418,11 @@ async def create_admin_user(
     _: None = Depends(require_admin_access),
 ) -> dict[str, Any]:
     metadata_store = request.app.state.metadata_store
-    user = {
-        "user_id": _new_id("usr"),
-        "username": payload.username,
-        "display_name": payload.display_name,
-        "created_at": _utc_now_iso(),
-    }
+    user = User(
+        user_id=_new_id("usr"),
+        username=payload.username,
+        display_name=payload.display_name,
+    ).to_dict()
     created = await metadata_store.create_user(user)
     audit_logger.info("admin_user_created user_id=%s username=%s", created["user_id"], created["username"])
     return created
@@ -447,14 +445,14 @@ async def create_admin_token(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
     now = _utc_now_iso()
-    token_record = {
-        "token_id": _new_id("tok"),
-        "user_id": payload.user_id,
-        "token_type": payload.token_type,
-        "scopes": payload.scopes,
-        "created_at": now,
-        "revoked_at": None,
-    }
+    token_record = Token(
+        token_id=_new_id("tok"),
+        user_id=payload.user_id,
+        token_type=payload.token_type,
+        scopes=payload.scopes,
+        created_at=now,
+        revoked_at=None,
+    ).to_dict()
     token_payload = {
         "tid": token_record["token_id"],
         "sub": payload.user_id,

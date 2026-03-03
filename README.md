@@ -101,6 +101,7 @@ curl -X DELETE http://localhost:8000/admin/v1/tokens/<token_id> -H "X-Admin-Toke
 
 Tokens are persisted as SHA-256 hashes; the plaintext token is returned only once at creation time.
 Admin endpoints require `X-Admin-Token` that matches `OPEN_MESSENGER_ADMIN_API_TOKEN`.
+Entity IDs use `<prefix>_<ULID>` format (for example `msg_01ARZ...`), and API timestamps are normalized ISO8601 UTC strings ending with `Z`.
 
 Use JWT-like Bearer token on Native API requests:
 

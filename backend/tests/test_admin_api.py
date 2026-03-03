@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from app.auth import decode_and_verify_jwt_like_token
 from app.main import create_app
+from app.utils import is_valid_prefixed_ulid, parse_iso8601_utc
 
 
 def _admin_headers(token: str = "dev-admin-token") -> dict[str, str]:
@@ -20,8 +21,9 @@ def _create_user(client: TestClient, username: str = "alice") -> dict:
     )
     assert response.status_code == 201
     payload = response.json()
-    assert payload["user_id"].startswith("usr_")
+    assert is_valid_prefixed_ulid(payload["user_id"], "usr")
     assert payload["username"] == username
+    assert parse_iso8601_utc(payload["created_at"]).isoformat().endswith("+00:00")
     return payload
 
 
@@ -40,10 +42,11 @@ def test_create_user_and_token_then_revoke() -> None:
     )
     assert token_response.status_code == 201
     token_payload = token_response.json()
-    assert token_payload["token_id"].startswith("tok_")
+    assert is_valid_prefixed_ulid(token_payload["token_id"], "tok")
     assert token_payload["token_type"] == "bot_token"
     assert token_payload["token"]
     assert token_payload["token"].count(".") == 2
+    assert parse_iso8601_utc(token_payload["created_at"]).isoformat().endswith("+00:00")
 
     decoded_token = decode_and_verify_jwt_like_token(token_payload["token"], "dev-signing-secret")
     assert decoded_token["tid"] == token_payload["token_id"]

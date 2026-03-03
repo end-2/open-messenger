@@ -12,10 +12,10 @@
 
 ## 2. 도메인/데이터 모델
 
-- [ ] 엔티티 정의: `User`, `Token`, `Channel`, `ChannelMember`, `Message`, `Thread`, `FileObject`, `EventLog`
-- [ ] ID 표준 적용: ULID 생성/검증 유틸 구현
-- [ ] 시간 포맷 표준화: ISO8601 UTC 유틸 구현
-- [ ] 메시지 본문(content)과 메타데이터 분리 모델 구현 (`content_ref`)
+- [x] 엔티티 정의: `User`, `Token`, `Channel`, `ChannelMember`, `Message`, `Thread`, `FileObject`, `EventLog`
+- [x] ID 표준 적용: ULID 생성/검증 유틸 구현
+- [x] 시간 포맷 표준화: ISO8601 UTC 유틸 구현
+- [x] 메시지 본문(content)과 메타데이터 분리 모델 구현 (`content_ref`)
 
 ## 3. 저장소 추상화 계층
 
