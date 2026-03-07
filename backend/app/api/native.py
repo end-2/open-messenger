@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 from asyncio import Queue, TimeoutError, wait_for
 from pathlib import Path
 from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, File, Query, Request, Response, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Response, UploadFile, WebSocket, status
 from fastapi.responses import FileResponse, StreamingResponse
+from starlette.websockets import WebSocketDisconnect
 
 from app.auth import AuthContext, require_scopes
 from app.config import Settings, get_settings
@@ -13,6 +15,7 @@ from app.domain import Channel, Thread
 from app.errors import api_error
 
 from .helpers import (
+    authenticate_websocket_token,
     build_file_response,
     build_message_response,
     format_sse_event,
@@ -37,6 +40,24 @@ from .schemas import (
 
 
 router = APIRouter()
+
+
+async def _cancel_pending_tasks(tasks: set[asyncio.Task[Any]]) -> None:
+    for task in tasks:
+        task.cancel()
+    if tasks:
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+
+async def _receive_websocket_messages(
+    websocket: WebSocket,
+    control_queue: "asyncio.Queue[str | None]",
+) -> None:
+    try:
+        while True:
+            await control_queue.put(await websocket.receive_text())
+    except WebSocketDisconnect:
+        await control_queue.put(None)
 
 
 @router.get("/v1/events/stream")
@@ -70,6 +91,51 @@ async def stream_events(
             "Connection": "keep-alive",
         },
     )
+
+
+@router.websocket("/v1/events/ws")
+async def websocket_events(websocket: WebSocket) -> None:
+    try:
+        await authenticate_websocket_token(websocket, ["messages:read"])
+    except HTTPException as exc:
+        detail = exc.detail
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason=str(detail))
+        return
+
+    await websocket.accept()
+    event_bus = websocket.app.state.event_bus
+    queue: Queue[dict[str, Any]] = await event_bus.subscribe()
+    control_queue: asyncio.Queue[str | None] = asyncio.Queue()
+    receiver_task = asyncio.create_task(_receive_websocket_messages(websocket, control_queue))
+
+    try:
+        while True:
+            queue_task = asyncio.create_task(queue.get())
+            control_task = asyncio.create_task(control_queue.get())
+            done, pending = await asyncio.wait(
+                {queue_task, control_task},
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+
+            try:
+                if queue_task in done:
+                    event = queue_task.result()
+                    await websocket.send_json(event)
+                    continue
+
+                message = control_task.result()
+                if message is None:
+                    return
+                if message.strip().lower() == "ping":
+                    await websocket.send_json({"type": "pong"})
+            finally:
+                await _cancel_pending_tasks(pending)
+    except WebSocketDisconnect:
+        return
+    finally:
+        receiver_task.cancel()
+        await asyncio.gather(receiver_task, return_exceptions=True)
+        await event_bus.unsubscribe(queue)
 
 
 @router.get("/healthz")

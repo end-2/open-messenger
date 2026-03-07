@@ -8,7 +8,10 @@ from threading import Thread
 from typing import Iterator
 
 import httpx
+import pytest
 import uvicorn
+from fastapi.testclient import TestClient
+from starlette.websockets import WebSocketDisconnect
 
 from app.main import create_app
 from app.utils import is_valid_prefixed_ulid, parse_iso8601_utc
@@ -201,3 +204,80 @@ def test_event_stream_emits_file_uploaded_event() -> None:
     assert file_data["filename"] == "event.txt"
     assert file_data["mime_type"] == "text/plain"
     assert file_data["size_bytes"] == len(b"event payload")
+
+
+def test_websocket_event_gateway_emits_standard_events() -> None:
+    client = TestClient(create_app())
+    headers = _issue_bearer_headers(client)
+    channel_id = _create_channel(client, headers)
+
+    root_response = client.post(
+        f"/v1/channels/{channel_id}/messages",
+        json={"text": "root"},
+        headers=headers,
+    )
+    assert root_response.status_code == 201
+    root_message_id = root_response.json()["message_id"]
+
+    with client.websocket_connect("/v1/events/ws", headers=headers) as websocket:
+        thread_response = client.post(
+            f"/v1/channels/{channel_id}/threads",
+            json={"root_message_id": root_message_id},
+            headers=headers,
+        )
+        assert thread_response.status_code == 201
+        thread_id = thread_response.json()["thread_id"]
+
+        reply_response = client.post(
+            f"/v1/threads/{thread_id}/messages",
+            json={"text": "reply"},
+            headers=headers,
+        )
+        assert reply_response.status_code == 201
+        message_id = reply_response.json()["message_id"]
+
+        thread_event = websocket.receive_json()
+        message_event = websocket.receive_json()
+
+        websocket.send_text("ping")
+        assert websocket.receive_json() == {"type": "pong"}
+
+    assert thread_event["type"] == "thread.created"
+    assert thread_event["data"] == {
+        "channel_id": channel_id,
+        "thread_id": thread_id,
+        "root_message_id": root_message_id,
+        "reply_count": 0,
+    }
+    assert message_event["type"] == "message.created"
+    assert message_event["data"] == {
+        "channel_id": channel_id,
+        "thread_id": thread_id,
+        "message_id": message_id,
+        "sender_user_id": "system",
+        "compat_origin": "native",
+        "attachments": [],
+    }
+
+
+def test_websocket_event_gateway_requires_token_and_scope() -> None:
+    client = TestClient(create_app())
+
+    with pytest.raises(WebSocketDisconnect):
+        with client.websocket_connect("/v1/events/ws"):
+            pass
+
+    headers = _issue_bearer_headers(client, scopes=["channels:read"])
+    with pytest.raises(WebSocketDisconnect):
+        with client.websocket_connect("/v1/events/ws", headers=headers):
+            pass
+
+
+def test_websocket_event_gateway_accepts_query_token() -> None:
+    client = TestClient(create_app())
+    headers = _issue_bearer_headers(client)
+    raw_token = headers["Authorization"].split(" ", 1)[1]
+
+    with client.websocket_connect(f"/v1/events/ws?access_token={raw_token}") as websocket:
+        websocket.send_text("ping")
+        assert websocket.receive_json() == {"type": "pong"}

@@ -104,6 +104,24 @@ Open the SSE event stream:
 curl -N http://localhost:8000/v1/events/stream -H "Authorization: Bearer <token>"
 ```
 
+Open the WebSocket event stream:
+
+```bash
+python - <<'PY'
+import asyncio
+import websockets
+
+TOKEN = "<token>"
+
+async def main():
+    async with websockets.connect(f"ws://localhost:8000/v1/events/ws?access_token={TOKEN}") as ws:
+        await ws.send("ping")
+        print(await ws.recv())
+
+asyncio.run(main())
+PY
+```
+
 Compatibility endpoints:
 
 ```bash
@@ -172,6 +190,7 @@ When request volume exceeds the configured window on `/v1` or `/admin/v1`, the A
 `memory`, `file`, `redis`, and `mysql` backends are implemented.
 Slack `thread_ts`, Telegram `reply_to_message_id`, and Discord `message_reference` are mapped onto internal thread/reply relationships through metadata-backed compatibility mappings.
 `GET /v1/events/stream` provides an SSE feed with standard event payloads shaped as `event_id`, `type`, `occurred_at`, and `data`.
+`GET /v1/events/ws` provides the same event payloads over WebSocket. The socket requires `messages:read` scope, accepts `Authorization: Bearer <token>` or `access_token` query authentication, and responds to `ping` with `{"type":"pong"}`.
 
 ## Storage Configuration
 

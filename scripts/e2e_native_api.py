@@ -11,6 +11,7 @@ import time
 from typing import Any
 
 import httpx
+from websockets.sync.client import connect as websocket_connect
 
 ULID_RE = re.compile(r"^[a-z][a-z0-9]*_[0-9A-HJKMNP-TV-Z]{26}$")
 
@@ -48,6 +49,14 @@ def _wait_for_health(client: httpx.Client, timeout_seconds: float = 30.0) -> Non
             last_error = str(exc)
         time.sleep(0.5)
     raise RuntimeError(f"Service did not become healthy within {timeout_seconds}s: {last_error}")
+
+
+def _to_websocket_url(base_url: str, path: str) -> str:
+    if base_url.startswith("https://"):
+        return f"wss://{base_url[len('https://'):]}{path}"
+    if base_url.startswith("http://"):
+        return f"ws://{base_url[len('http://'):]}{path}"
+    raise ValueError(f"Unsupported base URL: {base_url}")
 
 
 def run(base_url: str, admin_token: str) -> None:
@@ -158,6 +167,45 @@ def run(base_url: str, admin_token: str) -> None:
         _expect(
             first_reply["message_id"] == second_reply["message_id"],
             "Idempotency check failed for thread message",
+        )
+
+        websocket_url = _to_websocket_url(
+            base_url,
+            f"/v1/events/ws?access_token={bearer_token}",
+        )
+        with websocket_connect(websocket_url, open_timeout=5, close_timeout=5) as websocket:
+            websocket.send("ping")
+            pong_payload = json.loads(websocket.recv())
+            _expect(pong_payload == {"type": "pong"}, "WebSocket ping/pong failed")
+
+            thread_ws_response = _request(
+                client,
+                "POST",
+                f"/v1/channels/{channel_id}/threads",
+                201,
+                headers=native_headers,
+                json={"root_message_id": first_message["message_id"]},
+            ).json()
+            ws_thread_id = thread_ws_response["thread_id"]
+
+            ws_reply_response = _request(
+                client,
+                "POST",
+                f"/v1/threads/{ws_thread_id}/messages",
+                201,
+                headers=native_headers,
+                json={"text": "websocket reply", "sender_user_id": "e2e-sender"},
+            ).json()
+
+            ws_thread_event = json.loads(websocket.recv())
+            ws_message_event = json.loads(websocket.recv())
+
+        _expect(ws_thread_event["type"] == "thread.created", "WebSocket thread event missing")
+        _expect(ws_thread_event["data"]["thread_id"] == ws_thread_id, "WebSocket thread event mismatch")
+        _expect(ws_message_event["type"] == "message.created", "WebSocket message event missing")
+        _expect(
+            ws_message_event["data"]["message_id"] == ws_reply_response["message_id"],
+            "WebSocket message event mismatch",
         )
 
         listed = _request(

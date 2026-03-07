@@ -48,3 +48,21 @@ Optional: tighten or disable rate limiting during local runs:
 - `curl -X POST http://localhost:8000/v1/channels/<channel_id>/threads -H "Content-Type: application/json" -H "Authorization: Bearer <token>" -d '{"root_message_id":"<message_id>"}'`
 - `curl -X POST http://localhost:8000/admin/v1/users -H "Content-Type: application/json" -H "X-Admin-Token: dev-admin-token" -d '{"username":"alice"}'`
 - `curl http://localhost:8000/v1/channels/<channel_id> -H "Authorization: Bearer <token>"`
+
+WebSocket smoke check:
+
+```bash
+TOKEN="<token>" python - <<'PY'
+import asyncio
+import os
+import websockets
+
+async def main():
+    token = os.environ["TOKEN"]
+    async with websockets.connect(f"ws://localhost:8000/v1/events/ws?access_token={token}") as ws:
+        await ws.send("ping")
+        print(await ws.recv())
+
+asyncio.run(main())
+PY
+```

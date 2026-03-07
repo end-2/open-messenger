@@ -76,7 +76,7 @@
 - [x] 이벤트 타입 정의: `message.created`, `message.updated`, `message.deleted`, `thread.created`, `file.uploaded`
 - [x] 이벤트 발행 파이프라인 구현
 - [x] SSE 엔드포인트 구현: `GET /v1/events/stream`
-- [ ] WebSocket 게이트웨이 구현
+- [x] WebSocket 게이트웨이 구현
 - [x] 이벤트 페이로드 표준 스키마 적용 (`event_id`, `type`, `occurred_at`, `data`)
 
 ## 9. 파일 첨부
@@ -123,5 +123,5 @@
 - [ ] user/token 생성이 `/admin/v1`에서만 허용
 - [ ] Slack/Telegram/Discord 기본 메시지/파일 API 호환 동작
 - [ ] 선택형 저장소 백엔드 전환이 설정만으로 가능
-- [ ] SSE 또는 WebSocket을 통한 실시간 이벤트 수신 가능
+- [x] SSE 또는 WebSocket을 통한 실시간 이벤트 수신 가능
 - [ ] 핵심 테스트 스위트가 CI에서 안정적으로 통과

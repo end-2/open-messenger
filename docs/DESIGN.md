@@ -334,6 +334,7 @@ Current implementation notes:
 - The API layer computes `next_cursor` from the last item of a full page.
 - All metadata store implementations expose `list_channel_messages(channel_id, cursor, limit)`.
 - `memory`, `file`, and `mysql` metadata backends already implement the same cursor-based contract.
+- Realtime delivery is available via both `GET /v1/events/stream` and `GET /v1/events/ws`.
 
 ## 9. 이벤트 및 실시간
 
@@ -350,11 +351,20 @@ Current implementation notes:
 - WebSocket: 양방향 인터랙션
 - SSE: 서버 -> 클라이언트 단방향 스트림 (AI Agent 친화)
 
+WebSocket gateway contract:
+
+- Endpoint: `GET /v1/events/ws`
+- Authentication: `Authorization: Bearer <token>` header or `access_token` query parameter
+- Required scope: `messages:read`
+- Server events use the same payload schema as the SSE event stream
+- Client may send `ping` text frames and receives `{"type":"pong"}`
+
 초기 구현 범위:
 
 - `GET /v1/events/stream` SSE 엔드포인트 제공
+- `GET /v1/events/ws` WebSocket 게이트웨이 제공
 - 표준 이벤트 스키마를 사용해 `message.created`, `thread.created`, `file.uploaded` 발행
-- `message.updated`, `message.deleted`, WebSocket 게이트웨이는 후속 단계에서 확장
+- `message.updated`, `message.deleted` 이벤트는 후속 단계에서 확장
 
 이벤트 페이로드 표준:
 

@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
-from fastapi import Depends, Request, UploadFile, status
+from fastapi import Depends, Request, UploadFile, WebSocket, status
 
 from app.auth import (
     AuthContext,
@@ -117,16 +117,26 @@ def has_required_scope(granted_scopes: list[str], required_scope: str) -> bool:
     )
 
 
+def extract_raw_token_from_authorization_header(
+    authorization_header: str,
+    *,
+    allowed_prefixes: tuple[str, ...] = ("Bearer ",),
+) -> str:
+    for prefix in allowed_prefixes:
+        if authorization_header.startswith(prefix):
+            return authorization_header[len(prefix) :].strip()
+    return ""
+
+
 async def authenticate_compat_bearer_token(
     request: Request,
     required_scopes: list[str],
 ) -> AuthContext:
     auth_header = request.headers.get("authorization", "")
-    raw_token = ""
-    for prefix in ("Bearer ", "Bot "):
-        if auth_header.startswith(prefix):
-            raw_token = auth_header[len(prefix) :].strip()
-            break
+    raw_token = extract_raw_token_from_authorization_header(
+        auth_header,
+        allowed_prefixes=("Bearer ", "Bot "),
+    )
 
     if not raw_token:
         raise api_error(
@@ -138,6 +148,38 @@ async def authenticate_compat_bearer_token(
 
     settings: Settings = request.app.state.settings
     context = await authenticate_raw_token(raw_token, request, settings)
+    for required_scope in required_scopes:
+        if not has_required_scope(context.scopes, required_scope):
+            raise api_error(
+                status_code=status.HTTP_403_FORBIDDEN,
+                code="forbidden",
+                message=f"Missing required scope: {required_scope}",
+                retryable=False,
+            )
+    return context
+
+
+async def authenticate_websocket_token(
+    websocket: WebSocket,
+    required_scopes: list[str],
+) -> AuthContext:
+    raw_token = extract_raw_token_from_authorization_header(
+        websocket.headers.get("authorization", ""),
+        allowed_prefixes=("Bearer ",),
+    )
+    if not raw_token:
+        raw_token = websocket.query_params.get("access_token", "").strip()
+
+    if not raw_token:
+        raise api_error(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            code="unauthorized",
+            message="Missing bearer token",
+            retryable=False,
+        )
+
+    settings: Settings = websocket.app.state.settings
+    context = await authenticate_raw_token(raw_token, websocket, settings)
     for required_scope in required_scopes:
         if not has_required_scope(context.scopes, required_scope):
             raise api_error(
