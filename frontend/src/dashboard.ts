@@ -271,10 +271,6 @@ function renderBasePage(title: string, bodyClass: string, content: string): stri
         min-height: 40px;
         padding: 0 14px;
       }
-      .viewport-panel {
-        height: clamp(32rem, calc(100dvh - 18rem), 52rem);
-        min-height: 0;
-      }
       .sidebar-panel,
       .stream-panel,
       .chat-panel {
@@ -620,7 +616,7 @@ export function renderHomePage(config: FrontendConfig): string {
           </div>
           <p class="mono hint" id="service-details">Connecting to ${apiBaseUrl}</p>
         </article>
-        <article class="panel viewport-panel home-grid-workspace">
+        <article class="panel home-grid-workspace">
           <h2>Open Chat Workspace</h2>
           <p>
             Move to the dedicated chat page to create channels, load room history, send messages,

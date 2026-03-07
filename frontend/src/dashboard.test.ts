@@ -16,7 +16,8 @@ test("renderHomePage includes service and user bootstrap sections", () => {
   assert.doesNotMatch(html, /Channels and Messages/);
   assert.match(html, /http:\/\/127\.0\.0\.1:8000/);
   assert.match(html, /class="panel home-grid-summary"/);
-  assert.match(html, /class="panel viewport-panel home-grid-workspace"/);
+  assert.match(html, /class="panel home-grid-workspace"/);
+  assert.doesNotMatch(html, /viewport-panel/);
   assert.match(html, /class="panel home-grid-user"/);
   assert.match(html, /class="detail-dialog" id="identity-detail-dialog"/);
   assert.match(html, /id="identity-detail-content"/);
