@@ -11,7 +11,10 @@ RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 
 COPY backend ./backend
+COPY docs ./docs
+COPY ops ./ops
 COPY scripts ./scripts
+COPY config.yaml ./config.yaml
 COPY .env.example ./.env.example
 
 EXPOSE 8000

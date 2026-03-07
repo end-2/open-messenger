@@ -41,6 +41,10 @@ Optional: tighten or disable rate limiting during local runs:
    - `make test-frontend-docker`
 5. Stop the stack:
    - `make down`
+6. Render deploy-ready Compose configs from the maintained templates:
+   - `make deploy-single-config`
+   - `make deploy-staging-config`
+   - `make deploy-prod-config`
 
 ## Smoke Checks
 
@@ -81,3 +85,5 @@ Monitoring endpoints after `make up`:
 - Loki: `http://localhost:3100`
 - Tempo: `http://localhost:3200`
 - Grafana: `http://localhost:3000` (`admin` / `admin`)
+
+Deployment profiles, environment templates, and rollback/runbook instructions are maintained in `docs/DEPLOY.md`.

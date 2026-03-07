@@ -1,0 +1,150 @@
+services:
+  api:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    environment:
+      OPEN_MESSENGER_ENVIRONMENT: ${OPEN_MESSENGER_ENVIRONMENT:-prod}
+      OPEN_MESSENGER_CONTENT_BACKEND: ${OPEN_MESSENGER_CONTENT_BACKEND:-redis}
+      OPEN_MESSENGER_METADATA_BACKEND: ${OPEN_MESSENGER_METADATA_BACKEND:-mysql}
+      OPEN_MESSENGER_FILE_STORAGE_BACKEND: ${OPEN_MESSENGER_FILE_STORAGE_BACKEND:-local}
+      OPEN_MESSENGER_STORAGE_DIR: ${OPEN_MESSENGER_STORAGE_DIR:-/var/lib/open-messenger/storage}
+      OPEN_MESSENGER_FILES_ROOT_DIR: ${OPEN_MESSENGER_FILES_ROOT_DIR:-/var/lib/open-messenger/files}
+      OPEN_MESSENGER_REDIS_URL: ${OPEN_MESSENGER_REDIS_URL:-redis://redis:6379/0}
+      OPEN_MESSENGER_REDIS_CONTENT_KEY_PREFIX: ${OPEN_MESSENGER_REDIS_CONTENT_KEY_PREFIX:-open_messenger:content}
+      OPEN_MESSENGER_MYSQL_DSN: ${OPEN_MESSENGER_MYSQL_DSN:-mysql+pymysql://app:app@mysql:3306/open_messenger}
+      OPEN_MESSENGER_MYSQL_TABLE_PREFIX: ${OPEN_MESSENGER_MYSQL_TABLE_PREFIX:-open_messenger}
+      OPEN_MESSENGER_MAX_UPLOAD_MB: ${OPEN_MESSENGER_MAX_UPLOAD_MB:-50}
+      OPEN_MESSENGER_ADMIN_API_TOKEN: ${OPEN_MESSENGER_ADMIN_API_TOKEN:-change-me-prod-admin-token}
+      OPEN_MESSENGER_TOKEN_SIGNING_SECRET: ${OPEN_MESSENGER_TOKEN_SIGNING_SECRET:-change-me-prod-signing-secret}
+      OPEN_MESSENGER_RATE_LIMIT_MAX_REQUESTS: ${OPEN_MESSENGER_RATE_LIMIT_MAX_REQUESTS:-300}
+      OPEN_MESSENGER_RATE_LIMIT_WINDOW_SECONDS: ${OPEN_MESSENGER_RATE_LIMIT_WINDOW_SECONDS:-60}
+      OPEN_MESSENGER_TRACING_ENABLED: ${OPEN_MESSENGER_TRACING_ENABLED:-true}
+      OPEN_MESSENGER_TRACING_SERVICE_NAME: ${OPEN_MESSENGER_TRACING_SERVICE_NAME:-open-messenger-api}
+      OPEN_MESSENGER_OTLP_TRACES_ENDPOINT: ${OPEN_MESSENGER_OTLP_TRACES_ENDPOINT:-http://tempo:4318/v1/traces}
+    ports:
+      - "8000:8000"
+    volumes:
+      - api_files:/var/lib/open-messenger/files
+    depends_on:
+      redis:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      tempo:
+        condition: service_started
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2)",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7.4-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-change-me-prod-root-password}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-open_messenger}
+      MYSQL_USER: ${MYSQL_USER:-app}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-change-me-prod-db-password}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "127.0.0.1",
+          "-uroot",
+          "-p${MYSQL_ROOT_PASSWORD:-change-me-prod-root-password}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  prometheus:
+    image: prom/prometheus:v3.2.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    volumes:
+      - ../prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      api:
+        condition: service_healthy
+
+  loki:
+    image: grafana/loki:3.4.1
+    command:
+      - -config.file=/etc/loki/loki-config.yml
+    ports:
+      - "3100:3100"
+    volumes:
+      - ../loki/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - loki_data:/loki
+
+  promtail:
+    image: grafana/promtail:3.4.1
+    command:
+      - -config.file=/etc/promtail/promtail-config.yml
+    volumes:
+      - ../promtail/promtail-config.yml:/etc/promtail/promtail-config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      loki:
+        condition: service_started
+
+  tempo:
+    image: grafana/tempo:2.7.1
+    command:
+      - -config.file=/etc/tempo/tempo.yml
+    ports:
+      - "3200:3200"
+      - "4317:4317"
+      - "4318:4318"
+    volumes:
+      - ../tempo/tempo.yml:/etc/tempo/tempo.yml:ro
+      - tempo_data:/var/tempo
+
+  grafana:
+    image: grafana/grafana:11.5.2
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GF_SECURITY_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD:-admin}
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ../grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      prometheus:
+        condition: service_started
+      loki:
+        condition: service_started
+      tempo:
+        condition: service_started
+
+volumes:
+  api_files:
+  mysql_data:
+  loki_data:
+  tempo_data:
+  grafana_data:

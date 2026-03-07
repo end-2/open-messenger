@@ -13,6 +13,11 @@ profiles:
     max_upload_mb: 50
     admin_api_token: dev-admin-token
     token_signing_secret: dev-signing-secret
+    rate_limit_max_requests: 60
+    rate_limit_window_seconds: 60
+    tracing_enabled: false
+    tracing_service_name: open-messenger-api
+    otlp_traces_endpoint: http://localhost:4318/v1/traces
   staging:
     environment: staging
     content_backend: file
@@ -27,6 +32,11 @@ profiles:
     max_upload_mb: 50
     admin_api_token: change-me-staging
     token_signing_secret: change-me-staging-signing-secret
+    rate_limit_max_requests: 120
+    rate_limit_window_seconds: 60
+    tracing_enabled: true
+    tracing_service_name: open-messenger-api
+    otlp_traces_endpoint: http://tempo:4318/v1/traces
   prod:
     environment: prod
     content_backend: redis
@@ -41,3 +51,8 @@ profiles:
     max_upload_mb: 50
     admin_api_token: change-me-prod
     token_signing_secret: change-me-prod-signing-secret
+    rate_limit_max_requests: 300
+    rate_limit_window_seconds: 60
+    tracing_enabled: true
+    tracing_service_name: open-messenger-api
+    otlp_traces_endpoint: http://tempo:4318/v1/traces

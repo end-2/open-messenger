@@ -74,6 +74,16 @@ Run frontend scaffold unit test in Docker:
 make test-frontend-docker
 ```
 
+Render deployment configs:
+
+```bash
+make deploy-single-config
+make deploy-staging-config
+make deploy-prod-config
+```
+
+Deployment profiles, environment templates, monitoring layout, and rollback/runbook steps are documented in [`docs/DEPLOY.md`](docs/DEPLOY.md).
+
 ## API Smoke Check
 
 After `make run` or `make up`:

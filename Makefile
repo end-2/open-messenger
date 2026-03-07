@@ -5,7 +5,7 @@ PIP := $(VENV_DIR)/bin/pip
 PYTEST := $(VENV_DIR)/bin/pytest
 UVICORN := $(VENV_DIR)/bin/uvicorn
 
-.PHONY: help venv install run test e2e test-docker e2e-docker test-frontend-docker up down clean
+.PHONY: help venv install run test e2e test-docker e2e-docker test-frontend-docker up down deploy-single-config deploy-staging-config deploy-prod-config clean
 
 help:
 	@echo "Available targets:"
@@ -19,6 +19,9 @@ help:
 	@echo "  test-frontend-docker  Run frontend unit test in Docker"
 	@echo "  up           Start deployment test stack (API, Redis, MySQL, Prometheus, Loki, Tempo, Grafana)"
 	@echo "  down         Stop and remove deployment test stack"
+	@echo "  deploy-single-config  Render single-instance deployment compose config"
+	@echo "  deploy-staging-config Render staging deployment compose config"
+	@echo "  deploy-prod-config    Render production deployment compose config"
 	@echo "  clean        Remove local test artifacts"
 
 venv:
@@ -60,6 +63,15 @@ up:
 
 down:
 	docker compose down --volumes --remove-orphans
+
+deploy-single-config:
+	docker compose --env-file ops/deploy/env/dev.env.example -f ops/deploy/docker-compose.single-instance.yml config
+
+deploy-staging-config:
+	docker compose --env-file ops/deploy/env/staging.env.example -f ops/deploy/docker-compose.single-instance.yml config
+
+deploy-prod-config:
+	docker compose --env-file ops/deploy/env/prod.env.example -f ops/deploy/docker-compose.prod.yml config
 
 clean:
 	rm -rf $(VENV_DIR) .pytest_cache
