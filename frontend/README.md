@@ -12,6 +12,7 @@ This frontend is a lightweight TypeScript BFF and browser console for the docume
 - Keep the thread sidebar hidden until a message opens it, with a conventional chat-room style sidebar, transcript, and composer layout
 - Keep the main room transcript focused on root-level room messages while thread replies stay in the thread sidebar, and avoid exposing internal IDs in the room UI
 - Align messages from the current bearer token on the right side like a typical messenger UI, and keep thread actions compact
+- Enter the chat page from the main page after supplying or reusing a saved token, instead of editing the token inside the chat room
 - Subscribe to the backend SSE event stream through the frontend proxy
 
 ## Run
@@ -30,7 +31,7 @@ Environment variables:
 Open `http://127.0.0.1:3001` after the backend API is available.
 
 - `/`: service snapshot and user/token bootstrap
-- `/chat`: channel and message console with a room-style layout, authenticated sender display, and a dedicated thread panel
+- `/chat`: channel and message console with a room-style layout, authenticated sender display, and a dedicated thread panel; token entry happens on `/`
 
 ## Docker
 

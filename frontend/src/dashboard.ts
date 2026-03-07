@@ -513,11 +513,17 @@ export function renderHomePage(config: FrontendConfig): string {
               Move to the dedicated chat page to create channels, load room history, send messages,
               and watch the live event stream in a chat-style interface.
             </p>
-            <div class="row">
-              <a class="button-link" href="/chat">Enter chat console</a>
-              <button type="button" class="ghost" id="chat-link-with-token">Open with saved token</button>
-            </div>
-            <p class="hint">If you bootstrap a user here, the returned token is stored locally and can be reused on the chat page.</p>
+            <form class="stack" id="chat-entry-form">
+              <label>Access token
+                <input class="break-anywhere" name="accessToken" id="chat-entry-token" placeholder="Paste access token" />
+              </label>
+              <div class="row">
+                <button type="submit">Enter chat console</button>
+                <button type="button" class="ghost" id="chat-link-with-token">Use saved token</button>
+              </div>
+            </form>
+            <div class="status" id="chat-entry-status"></div>
+            <p class="hint">If you bootstrap a user here, the returned token is stored locally and can be reused when entering the chat page.</p>
           </article>
         </div>
         <div class="stack">
@@ -564,6 +570,9 @@ export function renderHomePage(config: FrontendConfig): string {
       const bootstrapStatus = document.querySelector("#bootstrap-status");
       const identityList = document.querySelector("#identity-list");
       const chatLinkWithToken = document.querySelector("#chat-link-with-token");
+      const chatEntryForm = document.querySelector("#chat-entry-form");
+      const chatEntryToken = document.querySelector("#chat-entry-token");
+      const chatEntryStatus = document.querySelector("#chat-entry-status");
 
       function setStatus(element, message, isSuccess = false) {
         element.textContent = message;
@@ -578,6 +587,29 @@ export function renderHomePage(config: FrontendConfig): string {
 
       function saveIdentity(payload) {
         localStorage.setItem("openMessenger.identity", JSON.stringify(payload));
+      }
+      function readStoredIdentity() {
+        try {
+          return JSON.parse(localStorage.getItem("openMessenger.identity") || "null");
+        } catch {
+          return null;
+        }
+      }
+      function enterChatWithToken(token) {
+        const accessToken = String(token || "").trim();
+        if (!accessToken) {
+          setStatus(chatEntryStatus, "Enter a token on this page before opening chat.");
+          return;
+        }
+        const identity = readStoredIdentity();
+        localStorage.setItem("openMessenger.identity", JSON.stringify({
+          user: identity?.user || null,
+          token: {
+            ...(identity?.token || {}),
+            token: accessToken
+          }
+        }));
+        window.location.href = "/chat";
       }
 
       async function loadInfo() {
@@ -600,19 +632,12 @@ export function renderHomePage(config: FrontendConfig): string {
       }
 
       chatLinkWithToken.addEventListener("click", () => {
-        const rawIdentity = localStorage.getItem("openMessenger.identity");
-        if (!rawIdentity) {
-          window.location.href = "/chat";
-          return;
-        }
-
-        try {
-          const identity = JSON.parse(rawIdentity);
-          const token = typeof identity.token?.token === "string" ? identity.token.token : "";
-          window.location.href = token ? "/chat?access_token=" + encodeURIComponent(token) : "/chat";
-        } catch {
-          window.location.href = "/chat";
-        }
+        const identity = readStoredIdentity();
+        enterChatWithToken(typeof identity?.token?.token === "string" ? identity.token.token : "");
+      });
+      chatEntryForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        enterChatWithToken(chatEntryToken.value);
       });
 
       bootstrapForm.addEventListener("submit", async (event) => {
@@ -642,6 +667,7 @@ export function renderHomePage(config: FrontendConfig): string {
           }
 
           saveIdentity(payload);
+          chatEntryToken.value = payload.token.token;
           setStatus(bootstrapStatus, "User and token created. The token is saved for the chat page.", true);
           identityList.innerHTML = [
             "<li><strong>User</strong><pre class='mono preformatted'>" + escapeClientHtml(formatJson(payload.user)) + "</pre></li>",
@@ -653,6 +679,13 @@ export function renderHomePage(config: FrontendConfig): string {
       });
 
       loadInfo();
+      {
+        const identity = readStoredIdentity();
+        const token = typeof identity?.token?.token === "string" ? identity.token.token : "";
+        if (token) {
+          chatEntryToken.value = token;
+        }
+      }
     </script>`
   );
 }
@@ -667,14 +700,7 @@ export function renderChatPage(): string {
           <div class="workspace-head">
             <a class="button-link ghost" href="/">Back to setup</a>
             <div class="workspace-name">Open Messenger</div>
-            <p class="hint" style="margin-bottom:0;">Use a Native API token, pick a room, and chat.</p>
-          </div>
-          <label>Access token
-            <input class="break-anywhere" name="accessToken" id="access-token-input" placeholder="Paste access token" required />
-          </label>
-          <div class="row">
-            <button type="button" id="save-session">Save token</button>
-            <button type="button" class="ghost" id="clear-session">Clear</button>
+            <p class="hint" style="margin-bottom:0;">Enter chat from the main page with a Native API token, then pick a room and chat.</p>
           </div>
           <div class="status" id="session-status"></div>
           <div class="utility-stack">
@@ -764,10 +790,7 @@ export function renderChatPage(): string {
       </section>
     </main>
     <script type="module">
-      const accessTokenInput = document.querySelector("#access-token-input");
       const sessionStatus = document.querySelector("#session-status");
-      const saveSessionButton = document.querySelector("#save-session");
-      const clearSessionButton = document.querySelector("#clear-session");
       const channelForm = document.querySelector("#channel-form");
       const channelStatus = document.querySelector("#channel-status");
       const channelList = document.querySelector("#channel-list");
@@ -791,6 +814,7 @@ export function renderChatPage(): string {
       let activeChannel = null;
       let activeThread = null;
       let eventSource = null;
+      let accessToken = "";
       function setStatus(element, message, isSuccess = false) {
         element.textContent = message;
         element.className = isSuccess ? "status success" : "status";
@@ -854,7 +878,7 @@ export function renderChatPage(): string {
         localStorage.setItem("openMessenger.channels", JSON.stringify(channels));
       }
       function getAccessToken() {
-        return accessTokenInput.value.trim();
+        return accessToken;
       }
       function addOrUpdateChannel(channel) {
         const channels = readStoredChannels();
@@ -1063,35 +1087,14 @@ export function renderChatPage(): string {
         const tokenFromUrl = params.get("access_token");
         const storedIdentity = readStoredIdentity();
         const storedToken = typeof storedIdentity?.token?.token === "string" ? storedIdentity.token.token : "";
-        accessTokenInput.value = tokenFromUrl || storedToken;
+        accessToken = (tokenFromUrl || storedToken || "").trim();
         sessionUserId.textContent = formatIdentityLabel(storedIdentity);
-        if (accessTokenInput.value) {
-          setStatus(sessionStatus, "Session restored from saved identity.", true);
+        if (accessToken) {
+          setStatus(sessionStatus, "Session restored from the main page entry.", true);
+        } else {
+          setStatus(sessionStatus, "Open chat from the main page after entering a token.");
         }
       }
-      saveSessionButton.addEventListener("click", () => {
-        const token = getAccessToken();
-        if (!token) {
-          setStatus(sessionStatus, "Paste a token before saving.");
-          return;
-        }
-        const identity = readStoredIdentity();
-        const nextIdentity = {
-          user: identity?.user || null,
-          token: {
-            ...(identity?.token || {}),
-            token
-          }
-        };
-        localStorage.setItem("openMessenger.identity", JSON.stringify(nextIdentity));
-        setStatus(sessionStatus, "Token saved for this browser.", true);
-      });
-      clearSessionButton.addEventListener("click", () => {
-        accessTokenInput.value = "";
-        sessionUserId.textContent = "Unknown user";
-        localStorage.removeItem("openMessenger.identity");
-        setStatus(sessionStatus, "Saved token cleared.", true);
-      });
       channelForm.addEventListener("submit", async (event) => {
         event.preventDefault();
         const form = new FormData(channelForm);
