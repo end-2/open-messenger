@@ -1067,6 +1067,16 @@ export function renderChatPage(): string {
           stopEventStream("Event stream disconnected.", false);
         };
       }
+      function sortChannelsForSidebar(items) {
+        return [...items].sort((left, right) => {
+          const leftCreatedAt = Date.parse(String(left?.created_at || ""));
+          const rightCreatedAt = Date.parse(String(right?.created_at || ""));
+          if (!Number.isNaN(leftCreatedAt) && !Number.isNaN(rightCreatedAt) && leftCreatedAt !== rightCreatedAt) {
+            return rightCreatedAt - leftCreatedAt;
+          }
+          return String(left?.name || "").localeCompare(String(right?.name || ""));
+        });
+      }
       function renderChannelList() {
         channelList.innerHTML = "";
         if (channels.length === 0) {
@@ -1107,7 +1117,7 @@ export function renderChatPage(): string {
           if (!response.ok) {
             throw new Error(formatJson(payload));
           }
-          channels = Array.isArray(payload.items) ? payload.items : [];
+          channels = sortChannelsForSidebar(Array.isArray(payload.items) ? payload.items : []);
           if (activeChannel) {
             activeChannel = channels.find((channel) => channel.channel_id === activeChannel.channel_id) || null;
           }

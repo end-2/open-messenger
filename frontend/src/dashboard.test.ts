@@ -70,6 +70,8 @@ test("renderChatPage includes dedicated chat workflow sections", () => {
   assert.match(html, /function formatIdentityLabel\(identity\)/);
   assert.match(html, /function decodeCurrentUserId\(\)/);
   assert.match(html, /function toggleThreadSidebar\(isOpen\)/);
+  assert.match(html, /function sortChannelsForSidebar\(items\)/);
+  assert.match(html, /return rightCreatedAt - leftCreatedAt;/);
   assert.match(html, /async function loadChannels\(preferredChannelId = ""\)/);
   assert.match(html, /fetch\("\/api\/channels\/list"/);
   assert.match(html, /function validateChatAccessOrRedirect\(\)/);
