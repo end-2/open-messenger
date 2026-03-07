@@ -17,6 +17,9 @@ test("renderHomePage includes service and user bootstrap sections", () => {
   assert.match(html, /http:\/\/127\.0\.0\.1:8000/);
   assert.match(html, /class="card-list identity-output"/);
   assert.match(html, /\.preformatted \{/);
+  assert.match(html, /function escapeClientHtml\(value\)/);
+  assert.match(html, /escapeClientHtml\(formatJson\(payload\.user\)\)/);
+  assert.match(html, /escapeClientHtml\(formatJson\(payload\.token\)\)/);
 });
 
 test("renderChatPage includes dedicated chat workflow sections", () => {
@@ -34,4 +37,6 @@ test("renderChatPage includes dedicated chat workflow sections", () => {
   assert.match(html, /class="feed scroll-region" id="event-feed"/);
   assert.match(html, /class="break-anywhere" name="accessToken"/);
   assert.doesNotMatch(html, /Sender user ID/);
+  assert.match(html, /function escapeClientHtml\(value\)/);
+  assert.match(html, /escapeClientHtml\(event\.data\)/);
 });
