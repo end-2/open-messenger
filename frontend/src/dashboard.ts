@@ -168,7 +168,7 @@ function renderBasePage(title: string, bodyClass: string, content: string): stri
         justify-content: space-between;
         gap: 12px;
         align-items: center;
-        margin-top: 12px;
+        margin-top: 10px;
       }
       .thread-shell {
         display: grid;
@@ -249,7 +249,7 @@ function renderBasePage(title: string, bodyClass: string, content: string): stri
       .chat-panel {
         display: grid;
         grid-template-rows: auto minmax(0, 1fr) auto;
-        gap: 16px;
+        gap: 0;
       }
       .stream-panel {
         display: flex;
@@ -266,20 +266,185 @@ function renderBasePage(title: string, bodyClass: string, content: string): stri
         overflow: auto;
       }
       .chat-layout {
-        grid-template-columns: 320px minmax(0, 1fr) 320px;
+        grid-template-columns: 300px minmax(0, 1fr);
         align-items: stretch;
+      }
+      .chat-layout.thread-open {
+        grid-template-columns: 300px minmax(0, 1fr) 340px;
       }
       body.chat-body .shell {
         max-width: 1440px;
-        padding-bottom: 24px;
+        padding: 16px 14px 20px;
       }
       body.chat-body main.shell {
         min-height: 100dvh;
+      }
+      body.chat-body {
+        background:
+          radial-gradient(circle at top left, rgba(255,255,255,0.32), transparent 28%),
+          linear-gradient(180deg, #dbe6ef 0%, #edf2f7 18%, #f3f0e8 100%);
+      }
+      .chat-shell {
+        height: calc(100dvh - 36px);
+        min-height: 42rem;
+      }
+      .workspace-sidebar {
+        background: linear-gradient(180deg, rgba(24, 34, 48, 0.96), rgba(31, 44, 61, 0.96));
+        color: #eef4fa;
+        border: 1px solid rgba(255,255,255,0.08);
+      }
+      .workspace-sidebar .hint,
+      .workspace-sidebar .mono,
+      .workspace-sidebar label,
+      .workspace-sidebar p {
+        color: rgba(238, 244, 250, 0.72);
+      }
+      .workspace-sidebar input,
+      .workspace-sidebar textarea,
+      .workspace-sidebar select {
+        background: rgba(255,255,255,0.08);
+        border: 1px solid rgba(255,255,255,0.12);
+        color: #f7fbff;
+      }
+      .workspace-sidebar .ghost {
+        background: rgba(255,255,255,0.08);
+        border: 1px solid rgba(255,255,255,0.12);
+        color: #eef4fa;
+      }
+      .sidebar-section-title {
+        margin: 0 0 6px;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+      }
+      .workspace-head {
+        display: grid;
+        gap: 4px;
+      }
+      .workspace-name {
+        font-size: 1.3rem;
+        font-weight: 700;
+      }
+      .channel-item {
+        background: rgba(255,255,255,0.06);
+        border: 1px solid transparent;
+        border-radius: 16px;
+        padding: 12px 14px;
+      }
+      .channel-item.active {
+        background: rgba(255,255,255,0.14);
+        border-color: rgba(255,255,255,0.18);
+      }
+      .chat-surface {
+        background: rgba(250, 252, 255, 0.88);
+        border: 1px solid rgba(54, 71, 91, 0.12);
+      }
+      .chat-header {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+        padding-bottom: 16px;
+        border-bottom: 1px solid rgba(54, 71, 91, 0.12);
+      }
+      .room-title {
+        margin: 0 0 4px;
+        font-size: 1.45rem;
+      }
+      .room-subtitle {
+        margin: 0;
+      }
+      .message-stream {
+        padding: 18px 2px;
+        display: grid;
+        gap: 10px;
+        align-content: start;
+      }
+      .message-card {
+        display: grid;
+        gap: 8px;
+        padding: 12px 14px;
+        border-radius: 18px;
+        background: rgba(255,255,255,0.78);
+        border: 1px solid rgba(54, 71, 91, 0.08);
+      }
+      .message-meta {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+      }
+      .message-author {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .avatar-dot {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #d0572f, #f3a261);
+        color: #fff8f2;
+        font-weight: 700;
+      }
+      .composer {
+        border-top: 1px solid rgba(54, 71, 91, 0.12);
+        padding-top: 16px;
+      }
+      .composer-shell {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 12px;
+        align-items: end;
+        background: rgba(255,255,255,0.78);
+        border: 1px solid rgba(54, 71, 91, 0.12);
+        border-radius: 20px;
+        padding: 12px;
+      }
+      .composer-shell textarea {
+        min-height: 56px;
+        border: none;
+        background: transparent;
+        padding: 6px 8px;
+      }
+      .composer-shell textarea:focus {
+        outline: none;
+      }
+      .thread-sidebar[hidden] {
+        display: none;
+      }
+      .thread-header {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+      }
+      .thread-close {
+        width: auto;
+        padding: 10px 12px;
+      }
+      .utility-stack {
+        display: grid;
+        gap: 14px;
+        min-height: 0;
       }
       @media (max-width: 980px) {
         .row, .metrics, .home-grid, .chat-layout, .hero { grid-template-columns: 1fr; }
         .chat-layout {
           grid-auto-rows: minmax(18rem, 1fr);
+        }
+        .chat-layout.thread-open {
+          grid-template-columns: 1fr;
+        }
+        .chat-shell {
+          height: auto;
+          min-height: auto;
+        }
+        .composer-shell {
+          grid-template-columns: 1fr;
         }
       }
     </style>
@@ -471,24 +636,12 @@ export function renderChatPage(): string {
     "Open Messenger Chat Console",
     "chat-body",
     `    <main class="shell">
-      <section class="hero" style="grid-template-columns: 1.2fr auto; align-items:end;">
-        <div>
-          <span class="eyebrow">Channels and Messages</span>
-          <h1 style="max-width: 12ch;">Enter rooms, read history, and send messages.</h1>
-          <p>
-            This page isolates the message workflow into a more typical chat-room layout with a channel rail,
-            a room transcript, a composer, and the live event stream.
-          </p>
-        </div>
-        <div style="display:grid; gap:12px;">
-          <a class="button-link ghost" href="/">Back to service setup</a>
-        </div>
-      </section>
-      <section class="chat-layout viewport-panel">
-        <aside class="panel sidebar-panel">
-          <div>
-            <h2>Session</h2>
-            <p class="hint">Use the token from the first page or paste another Native API token.</p>
+      <section class="chat-layout chat-shell" id="chat-layout">
+        <aside class="panel sidebar-panel workspace-sidebar">
+          <div class="workspace-head">
+            <a class="button-link ghost" href="/">Back to setup</a>
+            <div class="workspace-name">Open Messenger</div>
+            <p class="hint" style="margin-bottom:0;">Use a Native API token, pick a room, and chat.</p>
           </div>
           <label>Access token
             <input class="break-anywhere" name="accessToken" id="access-token-input" placeholder="Paste access token" required />
@@ -498,60 +651,72 @@ export function renderChatPage(): string {
             <button type="button" class="ghost" id="clear-session">Clear</button>
           </div>
           <div class="status" id="session-status"></div>
-          <hr style="border:none; border-top:1px solid var(--border); width:100%; margin:0;" />
-          <div>
-            <h2>Create Channel</h2>
-            <form class="stack" id="channel-form">
-              <label>Channel name
-                <input name="channelName" placeholder="general" required />
-              </label>
-              <button type="submit">Create channel</button>
-            </form>
-            <div class="status" id="channel-status"></div>
-          </div>
-          <div class="stack" style="min-height:0;">
-            <div style="display:flex; justify-content:space-between; gap:12px; align-items:center;">
-              <h2 style="margin-bottom:0;">Rooms</h2>
-              <button type="button" class="ghost" id="refresh-messages">Refresh room</button>
+          <div class="utility-stack">
+            <div>
+              <p class="sidebar-section-title">Create Channel</p>
+              <form class="stack" id="channel-form">
+                <label>Channel name
+                  <input name="channelName" placeholder="general" required />
+                </label>
+                <button type="submit">Create channel</button>
+              </form>
+              <div class="status" id="channel-status"></div>
             </div>
-            <p class="hint">Created rooms are kept in local storage for quick re-entry.</p>
-            <ul class="card-list channel-list" id="channel-list"></ul>
+            <div class="stack" style="min-height:0;">
+              <div style="display:flex; justify-content:space-between; gap:12px; align-items:center;">
+                <p class="sidebar-section-title" style="margin-bottom:0;">Rooms</p>
+                <button type="button" class="ghost" id="refresh-messages">Refresh</button>
+              </div>
+              <p class="hint" style="margin:0;">Rooms stay in local storage for quick re-entry.</p>
+              <ul class="card-list channel-list" id="channel-list"></ul>
+            </div>
+            <section class="panel stream-panel" style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.08); box-shadow:none; padding:16px;">
+              <div>
+                <p class="sidebar-section-title" style="margin-bottom:6px;">Live Event Stream</p>
+                <p class="hint" style="margin-bottom:0;">The browser connects through the frontend SSE proxy.</p>
+              </div>
+              <div class="row">
+                <button type="button" id="start-stream">Start stream</button>
+                <button type="button" class="ghost" id="stop-stream">Stop stream</button>
+              </div>
+              <div class="status" id="stream-status"></div>
+              <ul class="feed scroll-region" id="event-feed"></ul>
+            </section>
           </div>
         </aside>
-        <section class="panel chat-panel">
-          <header style="display:flex; justify-content:space-between; gap:12px; align-items:flex-start; border-bottom:1px solid var(--border); padding-bottom:16px;">
+        <section class="panel chat-panel chat-surface">
+          <header class="chat-header">
             <div>
-              <p class="eyebrow" style="margin-bottom:6px;">Active Room</p>
-              <h2 id="active-channel-name" style="margin-bottom:4px;">Select a channel</h2>
-              <p class="mono hint break-anywhere" id="active-channel-id">No channel selected.</p>
+              <h2 class="room-title" id="active-channel-name">Select a channel</h2>
+              <p class="mono hint break-anywhere room-subtitle" id="active-channel-id">No channel selected.</p>
             </div>
             <div style="min-width: 220px;">
               <div class="hint">Authenticated sender</div>
               <div class="mono break-anywhere" id="session-user-id">Unknown user</div>
             </div>
           </header>
-          <div class="scroll-region" id="message-list" style="display:grid; gap:12px; align-content:start;"></div>
-          <form class="stack" id="message-form" style="border-top:1px solid var(--border); padding-top:16px;">
+          <div class="scroll-region message-stream" id="message-list"></div>
+          <form class="composer" id="message-form">
             <input type="hidden" name="channelId" id="channel-id-input" />
-            <label>Message
-              <textarea name="text" placeholder="Write to the room" style="min-height:100px;"></textarea>
-            </label>
-            <div class="row">
-              <label>Idempotency key
-                <input name="idempotencyKey" placeholder="optional-request-key" />
+            <div class="composer-shell">
+              <label style="gap:0;">
+                <textarea name="text" placeholder="Message this room"></textarea>
               </label>
               <div style="display:grid; align-content:end;">
-                <button type="submit">Send message</button>
+                <button type="submit">Send</button>
               </div>
             </div>
             <div class="status" id="message-status"></div>
           </form>
         </section>
-        <aside class="panel stream-panel">
+        <aside class="panel stream-panel thread-sidebar" id="thread-sidebar" hidden>
           <section class="thread-shell" style="flex:1;">
-            <div>
-              <h2>Thread</h2>
-              <p class="hint">Open a message thread to inspect replies and continue the conversation.</p>
+            <div class="thread-header">
+              <div>
+                <h2 style="margin-bottom:4px;">Thread</h2>
+                <p class="hint" style="margin-bottom:0;">Open a message thread to inspect replies and continue the conversation.</p>
+              </div>
+              <button type="button" class="ghost thread-close" id="close-thread">Close</button>
             </div>
             <div class="scroll-region" id="thread-panel">
               <article class="thread-root">
@@ -563,28 +728,11 @@ export function renderChatPage(): string {
               <label>Thread reply
                 <textarea name="text" placeholder="Reply in the active thread" style="min-height:92px;"></textarea>
               </label>
-              <div class="row">
-                <label>Idempotency key
-                  <input name="idempotencyKey" placeholder="optional-thread-request-key" />
-                </label>
-                <div style="display:grid; align-content:end;">
-                  <button type="submit">Send reply</button>
-                </div>
+              <div style="display:grid; align-content:end;">
+                <button type="submit">Send reply</button>
               </div>
               <div class="status" id="thread-status"></div>
             </form>
-          </section>
-          <section style="min-height: 18rem; flex:1; display:grid; grid-template-rows: auto auto auto minmax(0, 1fr); gap:16px;">
-            <div>
-              <h2>Live Event Stream</h2>
-              <p class="hint">The browser connects through the frontend SSE proxy.</p>
-            </div>
-            <div class="row">
-              <button type="button" id="start-stream">Start stream</button>
-              <button type="button" class="ghost" id="stop-stream">Stop stream</button>
-            </div>
-            <div class="status" id="stream-status"></div>
-            <ul class="feed scroll-region" id="event-feed"></ul>
           </section>
         </aside>
       </section>
@@ -605,6 +753,8 @@ export function renderChatPage(): string {
       const messageStatus = document.querySelector("#message-status");
       const messageList = document.querySelector("#message-list");
       const threadPanel = document.querySelector("#thread-panel");
+      const threadSidebar = document.querySelector("#thread-sidebar");
+      const closeThreadButton = document.querySelector("#close-thread");
       const threadForm = document.querySelector("#thread-form");
       const threadStatus = document.querySelector("#thread-status");
       const refreshMessagesButton = document.querySelector("#refresh-messages");
@@ -631,6 +781,14 @@ export function renderChatPage(): string {
       }
       function formatSenderLabel(message) {
         return message?.sender_display_name || message?.sender_username || message?.sender_user_id || "unknown sender";
+      }
+      function formatSenderInitial(message) {
+        const label = formatSenderLabel(message).trim();
+        return label ? label.charAt(0).toUpperCase() : "?";
+      }
+      function toggleThreadSidebar(isOpen) {
+        threadSidebar.hidden = !isOpen;
+        document.querySelector("#chat-layout")?.classList.toggle("thread-open", isOpen);
       }
       ${renderClientEscapeHelper()}
       function readStoredIdentity() {
@@ -669,10 +827,10 @@ export function renderChatPage(): string {
         }
         for (const channel of channels) {
           const item = document.createElement("li");
+          item.className = "channel-item" + (
+            activeChannel && activeChannel.channel_id === channel.channel_id ? " active" : ""
+          );
           item.style.cursor = "pointer";
-          item.style.border = activeChannel && activeChannel.channel_id === channel.channel_id
-            ? "1px solid rgba(208, 87, 47, 0.35)"
-            : "1px solid transparent";
           item.innerHTML = [
             "<strong># " + escapeClientHtml(channel.name) + "</strong>",
             "<div class='mono hint'>" + escapeClientHtml(channel.channel_id) + "</div>",
@@ -693,6 +851,7 @@ export function renderChatPage(): string {
         activeChannelId.textContent = channel.channel_id;
         renderChannelList();
         renderThreadPanel();
+        toggleThreadSidebar(false);
       }
       function renderMessages(items) {
         messageList.innerHTML = "";
@@ -702,17 +861,17 @@ export function renderChatPage(): string {
         }
         for (const item of items) {
           const bubble = document.createElement("article");
-          bubble.className = "panel";
-          bubble.style.padding = "16px";
-          bubble.style.background = "var(--panel-strong)";
+          bubble.className = "message-card";
           const threadButtonLabel = item.thread_id ? "Open thread" : "Start thread";
           bubble.innerHTML = [
-            "<div style='display:flex; justify-content:space-between; gap:12px; align-items:center;'>",
+            "<div class='message-meta'>",
+            "<div class='message-author'>",
+            "<span class='avatar-dot'>" + escapeClientHtml(formatSenderInitial(item)) + "</span>",
             "<strong>" + escapeClientHtml(formatSenderLabel(item)) + "</strong>",
+            "</div>",
             "<time class='hint'>" + escapeClientHtml(formatTimestamp(item.created_at)) + "</time>",
             "</div>",
-            "<p class='preformatted' style='color:var(--text); margin:12px 0 10px;'>" + escapeClientHtml(item.text) + "</p>",
-            "<div class='mono hint break-anywhere'>" + escapeClientHtml(item.message_id) + "</div>",
+            "<p class='preformatted' style='color:var(--text); margin:0;'>" + escapeClientHtml(item.text) + "</p>",
             "<div class='message-actions'>",
             "<span class='pill'>" + (item.thread_id ? "thread reply" : "channel message") + "</span>",
             "<button type='button' class='ghost' data-message-id='" + escapeClientHtml(item.message_id) + "' data-thread-id='" + escapeClientHtml(item.thread_id || "") + "'>" + threadButtonLabel + "</button>",
@@ -793,6 +952,7 @@ export function renderChatPage(): string {
           throw new Error(formatJson(payload));
         }
         activeThread = payload;
+        toggleThreadSidebar(true);
         renderThreadPanel(payload);
         setStatus(threadStatus, "Thread loaded.", true);
       }
@@ -922,7 +1082,6 @@ export function renderChatPage(): string {
         const form = new FormData(messageForm);
         const channelId = String(form.get("channelId") || "").trim();
         const text = String(form.get("text") || "").trim();
-        const idempotencyKey = String(form.get("idempotencyKey") || "").trim();
         if (!accessToken) {
           setStatus(sessionStatus, "An access token is required.");
           return;
@@ -939,8 +1098,7 @@ export function renderChatPage(): string {
             body: JSON.stringify({
               accessToken,
               channelId,
-              text,
-              idempotencyKey
+              text
             })
           });
           const payload = await response.json();
@@ -960,7 +1118,6 @@ export function renderChatPage(): string {
         const accessToken = getAccessToken();
         const form = new FormData(threadForm);
         const text = String(form.get("text") || "").trim();
-        const idempotencyKey = String(form.get("idempotencyKey") || "").trim();
         if (!accessToken) {
           setStatus(sessionStatus, "An access token is required.");
           return;
@@ -977,8 +1134,7 @@ export function renderChatPage(): string {
             body: JSON.stringify({
               accessToken,
               threadId: activeThread.thread.thread_id,
-              text,
-              idempotencyKey
+              text
             })
           });
           const payload = await response.json();
@@ -997,6 +1153,12 @@ export function renderChatPage(): string {
       });
       refreshMessagesButton.addEventListener("click", () => {
         void loadMessages();
+      });
+      closeThreadButton.addEventListener("click", () => {
+        activeThread = null;
+        renderThreadPanel();
+        toggleThreadSidebar(false);
+        setStatus(threadStatus, "");
       });
       startStreamButton.addEventListener("click", () => {
         const accessToken = getAccessToken();
@@ -1029,6 +1191,7 @@ export function renderChatPage(): string {
       restoreSession();
       renderChannelList();
       renderThreadPanel();
+      toggleThreadSidebar(false);
       const channels = readStoredChannels();
       if (channels.length > 0) {
         setActiveChannel(channels[0]);

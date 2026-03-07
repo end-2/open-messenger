@@ -25,20 +25,24 @@ test("renderHomePage includes service and user bootstrap sections", () => {
 test("renderChatPage includes dedicated chat workflow sections", () => {
   const html = renderChatPage();
 
-  assert.match(html, /Channels and Messages/);
   assert.match(html, /Create Channel/);
   assert.match(html, /Live Event Stream/);
-  assert.match(html, /Active Room/);
   assert.match(html, /Authenticated sender/);
-  assert.match(html, /Open a message thread/);
+  assert.match(html, /id="thread-sidebar" hidden/);
+  assert.match(html, /id="close-thread"/);
   assert.match(html, /id="thread-panel"/);
-  assert.match(html, /class="chat-layout viewport-panel"/);
-  assert.match(html, /class="scroll-region" id="message-list"/);
+  assert.match(html, /class="chat-layout chat-shell" id="chat-layout"/);
+  assert.match(html, /class="scroll-region message-stream" id="message-list"/);
   assert.match(html, /class="feed scroll-region" id="event-feed"/);
   assert.match(html, /class="break-anywhere" name="accessToken"/);
+  assert.match(html, /class="composer-shell"/);
+  assert.match(html, /class="workspace-name">Open Messenger</);
   assert.doesNotMatch(html, /Sender user ID/);
+  assert.doesNotMatch(html, /Idempotency key/);
+  assert.doesNotMatch(html, /<h1/);
   assert.match(html, /function escapeClientHtml\(value\)/);
   assert.match(html, /function formatSenderLabel\(message\)/);
+  assert.match(html, /function toggleThreadSidebar\(isOpen\)/);
   assert.match(html, /sender_display_name/);
   assert.match(html, /escapeClientHtml\(event\.data\)/);
 });
