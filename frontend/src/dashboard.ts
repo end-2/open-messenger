@@ -561,7 +561,7 @@ export function renderChatPage(): string {
               <div class="status" id="thread-status"></div>
             </form>
           </section>
-          <section class="stack" style="min-height: 18rem; flex:1;">
+          <section style="min-height: 18rem; flex:1; display:grid; grid-template-rows: auto auto auto minmax(0, 1fr); gap:16px;">
             <div>
               <h2>Live Event Stream</h2>
               <p class="hint">The browser connects through the frontend SSE proxy.</p>
@@ -1064,7 +1064,7 @@ export function renderChatPage(): string {
 
         eventSource.onmessage = (event) => {
           const item = document.createElement("li");
-          item.innerHTML = "<time>" + new Date().toLocaleTimeString() + "</time><pre class=\\"mono preformatted\\" style=\\"margin:8px 0 0;\\">" + event.data.replaceAll("<", "&lt;").replaceAll(">", "&gt;") + "</pre>";
+          item.innerHTML = "<time>" + new Date().toLocaleTimeString() + "</time><pre class=\\"mono preformatted\\" style=\\"margin:8px 0 0;\\">" + escapeClientHtml(event.data) + "</pre>";
           eventFeed.prepend(item);
         };
 
@@ -1087,6 +1087,7 @@ export function renderChatPage(): string {
       const channels = readStoredChannels();
       if (channels.length > 0) {
         setActiveChannel(channels[0]);
+        void loadMessages();
       }
     </script>`
   );
