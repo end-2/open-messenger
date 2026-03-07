@@ -116,10 +116,12 @@ Create an admin user and token:
 ```bash
 curl -X POST http://localhost:8000/admin/v1/users -H "Content-Type: application/json" -H "X-Admin-Token: dev-admin-token" -d '{"username":"alice","display_name":"Alice"}'
 curl -X POST http://localhost:8000/admin/v1/tokens -H "Content-Type: application/json" -H "X-Admin-Token: dev-admin-token" -d '{"user_id":"<user_id>","token_type":"bot_token","scopes":["messages:write"]}'
+curl -X POST http://localhost:8000/admin/v1/tokens/<token_id>/rotate -H "X-Admin-Token: dev-admin-token"
 curl -X DELETE http://localhost:8000/admin/v1/tokens/<token_id> -H "X-Admin-Token: dev-admin-token"
 ```
 
 Tokens are persisted as SHA-256 hashes; the plaintext token is returned only once at creation time.
+Rotation returns a new plaintext token once and immediately revokes the previous token.
 Admin endpoints require `X-Admin-Token` that matches `OPEN_MESSENGER_ADMIN_API_TOKEN`.
 Entity IDs use `<prefix>_<ULID>` format (for example `msg_01ARZ...`), and API timestamps are normalized ISO8601 UTC strings ending with `Z`.
 

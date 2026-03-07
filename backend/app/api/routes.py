@@ -145,6 +145,52 @@ def _build_file_response(stored: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+async def _issue_admin_token(
+    metadata_store: Any,
+    settings: Settings,
+    *,
+    user_id: str,
+    token_type: str,
+    scopes: list[str],
+) -> dict[str, Any]:
+    now = _utc_now_iso()
+    token_record = Token(
+        token_id=_new_id("tok"),
+        user_id=user_id,
+        token_type=token_type,
+        scopes=scopes,
+        created_at=now,
+        revoked_at=None,
+    ).to_dict()
+    token_payload = {
+        "tid": token_record["token_id"],
+        "sub": user_id,
+        "token_type": token_type,
+        "scopes": scopes,
+        "iat": now,
+    }
+    plain_token = create_jwt_like_token(token_payload, settings.token_signing_secret)
+    token_record["token_hash"] = sha256_hexdigest(plain_token)
+
+    stored = await metadata_store.create_token(token_record)
+    audit_logger.info(
+        "admin_token_created token_id=%s user_id=%s token_type=%s scopes=%d",
+        stored["token_id"],
+        stored["user_id"],
+        stored["token_type"],
+        len(stored["scopes"]),
+    )
+    return {
+        "token_id": stored["token_id"],
+        "user_id": stored["user_id"],
+        "token_type": stored["token_type"],
+        "scopes": stored["scopes"],
+        "created_at": stored["created_at"],
+        "revoked_at": stored["revoked_at"],
+        "token": plain_token,
+    }
+
+
 async def require_admin_access(
     request: Request,
     settings: Settings = Depends(get_settings),
@@ -647,42 +693,59 @@ async def create_admin_token(
             retryable=False,
         )
 
-    now = _utc_now_iso()
-    token_record = Token(
-        token_id=_new_id("tok"),
+    return await _issue_admin_token(
+        metadata_store,
+        settings,
         user_id=payload.user_id,
         token_type=payload.token_type,
         scopes=payload.scopes,
-        created_at=now,
-        revoked_at=None,
-    ).to_dict()
-    token_payload = {
-        "tid": token_record["token_id"],
-        "sub": payload.user_id,
-        "token_type": payload.token_type,
-        "scopes": payload.scopes,
-        "iat": now,
-    }
-    plain_token = create_jwt_like_token(token_payload, settings.token_signing_secret)
-    token_record["token_hash"] = sha256_hexdigest(plain_token)
-
-    stored = await metadata_store.create_token(token_record)
-    audit_logger.info(
-        "admin_token_created token_id=%s user_id=%s token_type=%s scopes=%d",
-        stored["token_id"],
-        stored["user_id"],
-        stored["token_type"],
-        len(stored["scopes"]),
     )
-    return {
-        "token_id": stored["token_id"],
-        "user_id": stored["user_id"],
-        "token_type": stored["token_type"],
-        "scopes": stored["scopes"],
-        "created_at": stored["created_at"],
-        "revoked_at": stored["revoked_at"],
-        "token": plain_token,
-    }
+
+
+@router.post(
+    "/admin/v1/tokens/{token_id}/rotate",
+    response_model=CreateTokenResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def rotate_admin_token(
+    token_id: str,
+    request: Request,
+    settings: Settings = Depends(get_settings),
+    _: None = Depends(require_admin_access),
+) -> dict[str, Any]:
+    metadata_store = request.app.state.metadata_store
+    token = await metadata_store.get_token(token_id)
+    if token is None:
+        raise api_error(
+            status_code=status.HTTP_404_NOT_FOUND,
+            code="token_not_found",
+            message="Token not found",
+            retryable=False,
+        )
+
+    if token.get("revoked_at") is not None:
+        raise api_error(
+            status_code=status.HTTP_409_CONFLICT,
+            code="token_already_revoked",
+            message="Token has already been revoked",
+            retryable=False,
+        )
+
+    rotated = await _issue_admin_token(
+        metadata_store,
+        settings,
+        user_id=str(token["user_id"]),
+        token_type=str(token["token_type"]),
+        scopes=list(token.get("scopes", [])),
+    )
+    revoked_at = _utc_now_iso()
+    await metadata_store.update_token(token_id, {"revoked_at": revoked_at})
+    audit_logger.info(
+        "admin_token_rotated old_token_id=%s new_token_id=%s",
+        token_id,
+        rotated["token_id"],
+    )
+    return rotated
 
 
 @router.delete(

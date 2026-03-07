@@ -34,7 +34,7 @@
 - [x] `Authorization: Bearer <token>` 파서 및 미들웨어 구현
 - [x] 토큰 해시 저장(`sha256`) 및 평문 1회 노출 정책 구현
 - [x] 토큰 스코프 검사 구현 (`channels:*`, `messages:*`, `files:*`)
-- [ ] 토큰 회전(rotation) API 구현
+- [x] 토큰 회전(rotation) API 구현
 - [x] 토큰 폐기(revoke) API 구현
 - [ ] 기본 rate limit 적용
 
@@ -82,8 +82,8 @@
 ## 9. 파일 첨부
 
 - [ ] 파일 저장 루트 구성: `./data/files`
-- [ ] 업로드 크기 제한 구현 (`max_upload_mb`)
-- [ ] 파일 무결성 해시(`sha256`) 저장
+- [x] 업로드 크기 제한 구현 (`max_upload_mb`)
+- [x] 파일 무결성 해시(`sha256`) 저장
 - [ ] 파일 메타데이터(`FileObject`) 저장소 연동
 - [ ] 다운로드 시 토큰 권한 검증 구현
 
