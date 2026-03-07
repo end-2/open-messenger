@@ -5,7 +5,7 @@ PIP := $(VENV_DIR)/bin/pip
 PYTEST := $(VENV_DIR)/bin/pytest
 UVICORN := $(VENV_DIR)/bin/uvicorn
 
-.PHONY: help venv install run test e2e test-docker e2e-docker test-frontend-docker up down fullstack-up fullstack-down deploy-single-config deploy-staging-config deploy-prod-config clean
+.PHONY: help venv install run test e2e e2e-matrix test-docker e2e-docker e2e-matrix-docker test-frontend-docker up down fullstack-up fullstack-down deploy-single-config deploy-staging-config deploy-prod-config clean
 
 help:
 	@echo "Available targets:"
@@ -14,8 +14,10 @@ help:
 	@echo "  run          Run API server locally"
 	@echo "  test         Run unit tests in local venv"
 	@echo "  e2e          Run end-to-end API checks locally (starts temporary API server)"
+	@echo "  e2e-matrix   Run multi-user end-to-end matrix locally (starts temporary API server)"
 	@echo "  test-docker  Run unit tests in Docker"
 	@echo "  e2e-docker   Run end-to-end API checks in Docker"
+	@echo "  e2e-matrix-docker Run multi-user end-to-end matrix in Docker"
 	@echo "  test-frontend-docker  Run frontend unit test in Docker"
 	@echo "  up           Start deployment test stack (API, Redis, MySQL, Prometheus, Loki, Tempo, Grafana)"
 	@echo "  down         Stop and remove deployment test stack"
@@ -48,6 +50,15 @@ e2e: install
 	trap 'kill $$API_PID >/dev/null 2>&1 || true' EXIT; \
 	$(VENV_DIR)/bin/python scripts/e2e_native_api.py --base-url http://127.0.0.1:18000
 
+e2e-matrix: install
+	@set -euo pipefail; \
+	LOG_FILE=.pytest_cache/e2e-matrix-local-api.log; \
+	mkdir -p .pytest_cache; \
+	PYTHONPATH=backend $(UVICORN) app.main:app --host 127.0.0.1 --port 18000 > "$$LOG_FILE" 2>&1 & \
+	API_PID=$$!; \
+	trap 'kill $$API_PID >/dev/null 2>&1 || true' EXIT; \
+	PYTHONPATH=backend $(VENV_DIR)/bin/python scripts/e2e_native_matrix.py --base-url http://127.0.0.1:18000
+
 test-docker:
 	docker compose --profile test run --rm --build test
 
@@ -56,6 +67,12 @@ e2e-docker:
 	docker compose up --build -d api redis mysql; \
 	trap 'docker compose down --volumes --remove-orphans' EXIT; \
 	docker compose --profile test run --rm --build e2e
+
+e2e-matrix-docker:
+	@set -euo pipefail; \
+	docker compose up --build -d api redis mysql; \
+	trap 'docker compose down --volumes --remove-orphans' EXIT; \
+	docker compose --profile test run --rm --build e2e-matrix
 
 test-frontend-docker:
 	docker run --rm -v "$$PWD":/workspace -w /workspace/frontend node:22-alpine npm test

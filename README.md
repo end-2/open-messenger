@@ -33,6 +33,7 @@ Run end-to-end checks locally:
 
 ```bash
 make e2e
+make e2e-matrix
 ```
 
 Start the full application stack in Docker:
@@ -47,7 +48,10 @@ Run tests in Docker:
 make test-docker
 make test-frontend-docker
 make e2e-docker
+make e2e-matrix-docker
 ```
+
+The matrix E2E runner provisions multiple users with different scope sets, creates several channels, sends cross-user messages and thread replies, then validates fetched transcripts and thread contexts against embedded expected-answer fixtures.
 
 ## Basic API Example
 

@@ -14,6 +14,7 @@ Local Python environment:
 2. Run backend unit tests with `make test`.
 3. Run the backend server with `make run`.
 4. Run end-to-end checks with `make e2e`.
+5. Run the multi-user E2E matrix with `make e2e-matrix`.
 
 Frontend workflows:
 
@@ -40,9 +41,10 @@ Development and verification commands:
 2. Start the application stack with `make fullstack-up`.
 3. Run backend unit tests in Docker with `make test-docker`.
 4. Run backend E2E checks in Docker with `make e2e-docker`.
-5. Run frontend unit tests in Docker with `make test-frontend-docker`.
-6. Stop the deployment test stack with `make down`.
-7. Stop the application stack with `make fullstack-down`.
+5. Run the multi-user E2E matrix in Docker with `make e2e-matrix-docker`.
+6. Run frontend unit tests in Docker with `make test-frontend-docker`.
+7. Stop the deployment test stack with `make down`.
+8. Stop the application stack with `make fullstack-down`.
 
 Configuration previews:
 

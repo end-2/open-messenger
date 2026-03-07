@@ -235,7 +235,7 @@ The codebase emphasizes:
 - Shared contract tests for pluggable storage backends
 - API integration tests for native and compatibility routes
 - Token and scope enforcement tests
-- E2E checks for primary messaging flows
+- E2E checks for primary messaging flows, including multi-user scope matrices and expected transcript verification
 
 ## Related References
 

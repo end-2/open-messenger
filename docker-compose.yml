@@ -181,6 +181,20 @@ services:
       api:
         condition: service_healthy
 
+  e2e-matrix:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    profiles:
+      - test
+    environment:
+      OPEN_MESSENGER_E2E_BASE_URL: http://api:8000
+      OPEN_MESSENGER_E2E_ADMIN_TOKEN: dev-admin-token
+    command: ["python", "scripts/e2e_native_matrix.py"]
+    depends_on:
+      api:
+        condition: service_healthy
+
 volumes:
   mysql_data:
   loki_data:
