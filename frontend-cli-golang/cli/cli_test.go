@@ -119,12 +119,14 @@ func TestBootstrapStoresTokenInState(t *testing.T) {
 	if ctx.State.Username != "alice" {
 		t.Errorf("Username = %q, want %q", ctx.State.Username, "alice")
 	}
-	if len(*lines) == 0 {
-		t.Fatal("expected at least one output line")
+	if len(*lines) < 2 {
+		t.Fatalf("expected at least 2 output lines, got %d", len(*lines))
 	}
-	line := (*lines)[0]
-	if !containsAll(line, "bootstrapped", "user=alice", "token=secret") {
-		t.Errorf("unexpected output line: %q", line)
+	if !containsAll((*lines)[0], "bootstrapped", "user=alice", "token=secret") {
+		t.Errorf("unexpected output line[0]: %q", (*lines)[0])
+	}
+	if !containsAll((*lines)[1], "logged in", "alice") {
+		t.Errorf("unexpected output line[1]: %q", (*lines)[1])
 	}
 }
 

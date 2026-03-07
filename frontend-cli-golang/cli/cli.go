@@ -122,20 +122,65 @@ func ExecuteCommand(ctx CommandContext, inputLine string) (bool, error) {
 
 	switch command {
 	case "help":
-		writeLine("Commands:")
-		writeLine("  help")
-		writeLine("  info")
+		writeLine("Open Messenger CLI — available commands")
+		writeLine("")
+		writeLine("Authentication")
 		writeLine("  bootstrap <username> [display-name]")
+		writeLine("      Create a new user and immediately activate their access token.")
+		writeLine("      Example: bootstrap alice \"Alice Smith\"")
+		writeLine("")
 		writeLine("  token <access-token>")
+		writeLine("      Set an existing access token for this session.")
+		writeLine("      Example: token eyJhbGciOiJIUzI1NiIsInR5cCI6Ikp...")
+		writeLine("")
 		writeLine("  whoami")
+		writeLine("      Show the current session state (user, token status, active channel).")
+		writeLine("")
+		writeLine("Server")
+		writeLine("  info")
+		writeLine("      Show server version and backend configuration.")
+		writeLine("")
+		writeLine("Channels")
 		writeLine("  create-channel <name>")
+		writeLine("      Create a new channel and make it the active channel.")
+		writeLine("      Example: create-channel general")
+		writeLine("")
 		writeLine("  use-channel <channel-id>")
+		writeLine("      Switch to an existing channel by ID.")
+		writeLine("      Example: use-channel ch_01ABC...")
+		writeLine("")
+		writeLine("Messages  (requires an active channel)")
 		writeLine("  list [cursor]")
+		writeLine("      List messages in the active channel. Pass cursor for pagination.")
+		writeLine("      Example: list")
+		writeLine("      Example: list <next_cursor value>")
+		writeLine("")
 		writeLine("  send <text>")
+		writeLine("      Send a message to the active channel. Quote multi-word text.")
+		writeLine("      Example: send \"Hello, world!\"")
+		writeLine("")
+		writeLine("Threads")
 		writeLine("  thread <root-message-id>")
+		writeLine("      Create a thread starting from an existing message.")
+		writeLine("      Example: thread msg_01ABC...")
+		writeLine("")
 		writeLine("  reply <thread-id> <text>")
+		writeLine("      Post a reply to an existing thread.")
+		writeLine("      Example: reply th_01ABC... \"This is a reply\"")
+		writeLine("")
 		writeLine("  context <thread-id>")
-		writeLine("  exit")
+		writeLine("      Show the root message and all replies of a thread.")
+		writeLine("      Example: context th_01ABC...")
+		writeLine("")
+		writeLine("Other")
+		writeLine("  help    Show this help message.")
+		writeLine("  exit    Exit the CLI.")
+		writeLine("")
+		writeLine("Typical workflow:")
+		writeLine("  1. bootstrap alice \"Alice Smith\"   # creates user and activates token")
+		writeLine("  2. create-channel general          # creates channel and makes it active")
+		writeLine("  3. send \"Hello!\"                   # sends a message to the channel")
+		writeLine("  4. list                            # lists messages in the channel")
 		return true, nil
 
 	case "info":
@@ -169,6 +214,7 @@ func ExecuteCommand(ctx CommandContext, inputLine string) (bool, error) {
 		state.UserID = result.User.UserID
 		state.Username = result.User.Username
 		writeLine(fmt.Sprintf("bootstrapped user=%s token=%s", result.User.Username, result.Token.Token))
+		writeLine(fmt.Sprintf("logged in as %s — token is now active. Next: `create-channel <name>`", result.User.Username))
 		return true, nil
 
 	case "token":
@@ -354,6 +400,11 @@ func RunCLI(client BackendClient, initialToken, baseURL string, in io.Reader, ou
 
 	fmt.Fprintf(out, "Open Messenger CLI connected to %s\n", baseURL)
 	fmt.Fprintln(out, "Use `help` to see available commands.")
+	if state.AccessToken == "" {
+		fmt.Fprintln(out, "Tip: Run `bootstrap <username>` to create a user and activate a token.")
+	} else {
+		fmt.Fprintln(out, "Access token is configured. Run `whoami` to check your session.")
+	}
 
 	scanner := bufio.NewScanner(in)
 	for {
