@@ -95,6 +95,7 @@ Create and query messages:
 ```bash
 curl -X POST http://localhost:8000/v1/channels/<channel_id>/messages -H "Content-Type: application/json" -H "Authorization: Bearer <token>" -d '{"text":"hello"}'
 curl "http://localhost:8000/v1/channels/<channel_id>/messages?limit=20" -H "Authorization: Bearer <token>"
+curl "http://localhost:8000/v1/channels/<channel_id>/messages?limit=20&cursor=<next_cursor>" -H "Authorization: Bearer <token>"
 ```
 
 Open the SSE event stream:
@@ -149,6 +150,11 @@ The token uses JWT-like format (`header.payload.signature`) signed with `HS256`.
 
 `POST /v1/channels/{channel_id}/messages` and `POST /v1/threads/{thread_id}/messages` support `idempotency_key`.
 First request returns `201`, replay with the same key in the same channel/thread returns `200` and the original message.
+
+`GET /v1/channels/{channel_id}/messages` uses cursor pagination.
+`limit` defaults to `50` and is constrained to `1..200`.
+Use the returned `next_cursor` as the next request's `cursor`.
+When `next_cursor` is `null`, the client has reached the end of the channel message stream.
 
 Errors are standardized as:
 

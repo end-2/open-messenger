@@ -1,6 +1,6 @@
 # Open Messenger Design Document
 
-- 문서 버전: `v0.1`
+- 문서 버전: `v0.2`
 - 작성일: `2026-03-03`
 - 대상: Slack/Telegram/Discord 스타일의 멀티채널 메신저 플랫폼
 
@@ -223,6 +223,41 @@ Base path: `/v1`
 
 일반 `/v1` 경로에서는 `user/token` 생성 API를 제공하지 않는다.
 
+Message list pagination contract:
+
+- `GET /v1/channels/{channel_id}/messages` uses cursor pagination.
+- Results are returned in stable channel order from oldest to newest.
+- `limit` defaults to `50` and is constrained to `1..200`.
+- `cursor` is the last `message_id` returned by the previous page.
+- The response returns `items` and `next_cursor`.
+- When `next_cursor` is `null`, there are no more items to read.
+- Thread replies are included in the same channel message stream and preserve the same pagination rules.
+
+Response shape:
+
+```json
+{
+  "items": [
+    {
+      "message_id": "msg_01H...",
+      "channel_id": "ch_01H...",
+      "thread_id": null,
+      "sender_user_id": "usr_01H...",
+      "content_ref": "cnt_01H...",
+      "text": "hello",
+      "attachments": [],
+      "created_at": "2026-03-03T11:22:33Z",
+      "updated_at": "2026-03-03T11:22:33Z",
+      "deleted_at": null,
+      "compat_origin": "native",
+      "idempotency_key": null,
+      "metadata": {}
+    }
+  ],
+  "next_cursor": "msg_01H..."
+}
+```
+
 메시지 전송 요청 예시:
 
 ```json
@@ -292,6 +327,13 @@ Base path: `/admin/v1`
 5. Batch API 제공: `POST /v1/messages:batchGet`, `POST /v1/messages:batchCreate`
 6. 대화 컨텍스트 API: `GET /v1/threads/{thread_id}/context?limit=`
 7. 이벤트 스트림: `GET /v1/events/stream` (SSE) 또는 WebSocket
+
+Current implementation notes:
+
+- Native message pagination is implemented in `GET /v1/channels/{channel_id}/messages`.
+- The API layer computes `next_cursor` from the last item of a full page.
+- All metadata store implementations expose `list_channel_messages(channel_id, cursor, limit)`.
+- `memory`, `file`, and `mysql` metadata backends already implement the same cursor-based contract.
 
 ## 9. 이벤트 및 실시간
 
