@@ -16,6 +16,12 @@ Start the full application stack:
 make fullstack-up
 ```
 
+Run only the backend locally with a custom admin token:
+
+```bash
+OPEN_MESSENGER_ADMIN_API_TOKEN="my-admin-token" make run
+```
+
 Services after startup:
 
 ```bash
@@ -23,6 +29,8 @@ export API_URL="http://localhost:8000"
 export FRONTEND_URL="http://localhost:3001"
 export ADMIN_TOKEN="dev-admin-token"
 ```
+
+If you started the backend with a custom admin token, set `ADMIN_TOKEN` to the same value before running the admin API examples.
 
 Smoke-check the stack:
 
