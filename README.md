@@ -1,13 +1,13 @@
 # Open Messenger
 
-Open Messenger is a monorepo for a multi-channel messaging platform with a FastAPI backend, a Node.js TypeScript frontend console, and an interactive terminal CLI. The chat surfaces support channel messaging, root-level thread creation, threaded replies, live event inspection, and sender display-name rendering.
+Open Messenger is a monorepo for a multi-channel messaging platform with a FastAPI backend, a Node.js TypeScript frontend console, and an interactive terminal CLI written in Go. The chat surfaces support channel messaging, root-level thread creation, threaded replies, live event inspection, and sender display-name rendering.
 
 ## Quick Start
 
 Prerequisites:
 
 - Python 3.12+
-- Node.js 22+
+- Node.js 22+ (frontend console only)
 - Docker Engine with the Compose plugin
 
 Install the local Python environment:
@@ -27,7 +27,7 @@ Run local unit tests:
 ```bash
 make test
 cd frontend && npm test
-cd frontend-cli && npm test
+make test-frontend-cli-golang-docker
 ```
 
 Run end-to-end checks locally:
@@ -49,27 +49,30 @@ Run tests in Docker:
 ```bash
 make test-docker
 make test-frontend-docker
-make test-frontend-cli-docker
+make test-frontend-cli-golang-docker
 make e2e-docker
 ```
 
-Run the interactive CLI locally:
+Build and run the Go CLI:
 
 ```bash
-cd frontend-cli
-npm install
-npm run dev
+make build-go-cli
+./frontend-cli-golang/build/open-messenger-cli-go
 ```
 
-Useful commands inside the CLI include `bootstrap`, `create-channel`, `use-channel`, `list`, `send`, `thread`, `reply`, and `context`.
+`make build-go-cli` detects the current host OS and CPU architecture and compiles a static binary via the `golang:1.22-alpine` Docker image. The binary is written to `frontend-cli-golang/build/open-messenger-cli-go`. No Go toolchain is required on the host.
 
-Build the CLI binary in Docker:
+Inside the CLI, type `help` to see all available commands. A typical session:
 
-```bash
-make build
+```
+om> bootstrap alice "Alice Smith"
+om> create-channel general
+om:general> send "Hello!"
+om:general> list
+om:general> exit
 ```
 
-The Docker build writes a Linux x64 binary to `frontend-cli/build/open-messenger-cli`.
+Available commands: `bootstrap`, `token`, `whoami`, `info`, `create-channel`, `use-channel`, `list`, `send`, `thread`, `reply`, `context`, `exit`.
 
 `make e2e` and `make e2e-docker` both include the multi-user scenario that provisions users with different scope sets, creates several channels, sends cross-user messages and thread replies, then validates fetched transcripts and thread contexts against embedded expected-answer fixtures.
 
