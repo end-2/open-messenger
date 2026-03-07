@@ -600,7 +600,7 @@ export function renderHomePage(config: FrontendConfig): string {
           "<strong>Token</strong>",
           "<pre class='mono preformatted'>" + tokenValue + "</pre>",
           "<button type='button' class='ghost' data-detail-toggle='identity-details'>Detail</button>",
-          "<div id='identity-details' hidden style='margin-top:12px; display:grid; gap:12px;'>",
+          "<div id='identity-details' style='display:none; margin-top:12px; gap:12px;'>",
           "<div><strong>User</strong><pre class='mono preformatted'>" + userJson + "</pre></div>",
           "<div><strong>Token metadata</strong><pre class='mono preformatted'>" + tokenJson + "</pre></div>",
           "</div>",
@@ -615,8 +615,8 @@ export function renderHomePage(config: FrontendConfig): string {
           if (!detailPanel) {
             return;
           }
-          const isOpen = !detailPanel.hidden;
-          detailPanel.hidden = isOpen;
+          const isOpen = detailPanel.style.display !== "none";
+          detailPanel.style.display = isOpen ? "none" : "grid";
           detailButton.textContent = isOpen ? "Detail" : "Hide detail";
         });
       }

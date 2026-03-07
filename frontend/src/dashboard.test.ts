@@ -26,6 +26,7 @@ test("renderHomePage includes service and user bootstrap sections", () => {
   assert.match(html, /function renderIdentityOutput\(payload\)/);
   assert.match(html, /function bindIdentityOutputToggles\(\)/);
   assert.match(html, /data-detail-toggle='identity-details'/);
+  assert.match(html, /id='identity-details' style='display:none; margin-top:12px; gap:12px;'/);
   assert.match(html, /Hide detail/);
   assert.match(html, /\/api\/session\/validate/);
   assert.match(html, /escapeClientHtml\(String\(payload\?\.token\?\.token \|\| ""\)\)/);
