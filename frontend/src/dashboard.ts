@@ -226,7 +226,7 @@ function renderBasePage(title: string, bodyClass: string, content: string): stri
       .home-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
         grid-template-areas:
-          "summary ."
+          "summary summary"
           "workspace user";
         align-items: start;
       }
