@@ -51,13 +51,16 @@ make e2e-docker
 
 ## Basic API Example
 
-The examples below cover a minimal flow:
+The examples below use only the required request fields and cover a minimal flow:
 
 1. Create a user with the admin API.
 2. Issue a bearer token for that user.
 3. Create a channel.
-4. Send a message.
+4. Send a root message.
 5. Fetch messages from the channel.
+6. Create a thread from the root message.
+7. Send a reply in the thread.
+8. Fetch the thread context.
 
 Assumptions:
 
@@ -78,8 +81,7 @@ USER_JSON=$(
     -H "Content-Type: application/json" \
     -H "X-Admin-Token: $ADMIN_TOKEN" \
     -d '{
-      "username": "alice",
-      "display_name": "Alice"
+      "username": "alice"
     }'
 )
 
@@ -126,26 +128,60 @@ export CHANNEL_ID="$(echo "$CHANNEL_JSON" | jq -r '.channel_id')"
 echo "$CHANNEL_JSON"
 ```
 
-Send a message:
+Send a root message:
 
 ```bash
-curl -sS -X POST "$API_URL/v1/channels/$CHANNEL_ID/messages" \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $ACCESS_TOKEN" \
-  -d "{
-    \"text\": \"Hello from the README example\",
-    \"sender_user_id\": \"$USER_ID\",
-    \"idempotency_key\": \"readme-example-message-1\",
-    \"metadata\": {
-      \"source\": \"readme\"
-    }
-  }"
+ROOT_MESSAGE_JSON=$(
+  curl -sS -X POST "$API_URL/v1/channels/$CHANNEL_ID/messages" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $ACCESS_TOKEN" \
+    -d '{
+      "text": "Hello from the README example"
+    }'
+)
+
+export ROOT_MESSAGE_ID="$(echo "$ROOT_MESSAGE_JSON" | jq -r '.message_id')"
+echo "$ROOT_MESSAGE_JSON"
 ```
 
 Fetch messages from the channel:
 
 ```bash
 curl -sS "$API_URL/v1/channels/$CHANNEL_ID/messages?limit=10" \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+```
+
+Create a thread from the root message:
+
+```bash
+THREAD_JSON=$(
+  curl -sS -X POST "$API_URL/v1/channels/$CHANNEL_ID/threads" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $ACCESS_TOKEN" \
+    -d "{
+      \"root_message_id\": \"$ROOT_MESSAGE_ID\"
+    }"
+)
+
+export THREAD_ID="$(echo "$THREAD_JSON" | jq -r '.thread_id')"
+echo "$THREAD_JSON"
+```
+
+Send a reply in the thread:
+
+```bash
+curl -sS -X POST "$API_URL/v1/threads/$THREAD_ID/messages" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -d '{
+    "text": "This is a thread reply"
+  }'
+```
+
+Fetch the thread context:
+
+```bash
+curl -sS "$API_URL/v1/threads/$THREAD_ID/context?limit=10" \
   -H "Authorization: Bearer $ACCESS_TOKEN"
 ```
 
