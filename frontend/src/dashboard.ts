@@ -591,6 +591,35 @@ export function renderHomePage(config: FrontendConfig): string {
           return null;
         }
       }
+      function renderIdentityOutput(payload) {
+        const userJson = escapeClientHtml(formatJson(payload.user));
+        const tokenJson = escapeClientHtml(formatJson(payload.token));
+        const tokenValue = escapeClientHtml(String(payload?.token?.token || ""));
+        return [
+          "<li>",
+          "<strong>Token</strong>",
+          "<pre class='mono preformatted'>" + tokenValue + "</pre>",
+          "<button type='button' class='ghost' data-detail-toggle='identity-details'>Detail</button>",
+          "<div id='identity-details' hidden style='margin-top:12px; display:grid; gap:12px;'>",
+          "<div><strong>User</strong><pre class='mono preformatted'>" + userJson + "</pre></div>",
+          "<div><strong>Token metadata</strong><pre class='mono preformatted'>" + tokenJson + "</pre></div>",
+          "</div>",
+          "</li>"
+        ].join("");
+      }
+      function bindIdentityOutputToggles() {
+        const detailButton = identityList.querySelector("[data-detail-toggle]");
+        detailButton?.addEventListener("click", () => {
+          const targetId = detailButton.getAttribute("data-detail-toggle");
+          const detailPanel = targetId ? document.getElementById(targetId) : null;
+          if (!detailPanel) {
+            return;
+          }
+          const isOpen = !detailPanel.hidden;
+          detailPanel.hidden = isOpen;
+          detailButton.textContent = isOpen ? "Detail" : "Hide detail";
+        });
+      }
       async function validateTokenOrWarn(accessToken) {
         const response = await fetch("/api/session/validate", {
           method: "POST",
@@ -683,10 +712,8 @@ export function renderHomePage(config: FrontendConfig): string {
           saveIdentity(payload);
           chatEntryToken.value = payload.token.token;
           setStatus(bootstrapStatus, "User and token created. The token is saved for the chat page.", true);
-          identityList.innerHTML = [
-            "<li><strong>User</strong><pre class='mono preformatted'>" + escapeClientHtml(formatJson(payload.user)) + "</pre></li>",
-            "<li><strong>Token</strong><pre class='mono preformatted'>" + escapeClientHtml(formatJson(payload.token)) + "</pre></li>"
-          ].join("");
+          identityList.innerHTML = renderIdentityOutput(payload);
+          bindIdentityOutputToggles();
         } catch (error) {
           setStatus(bootstrapStatus, error instanceof Error ? error.message : "Unknown error");
         }

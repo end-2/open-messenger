@@ -5,7 +5,7 @@ This frontend is a lightweight TypeScript BFF and browser console for the docume
 ## Scope
 
 - Inspect `/v1/info` service metadata
-- Bootstrap a user and plaintext token through `/admin/v1/users` and `/admin/v1/tokens`
+- Bootstrap a user and plaintext token through `/admin/v1/users` and `/admin/v1/tokens`, with the token shown first and additional details available on demand
 - Open a dedicated chat page for channel creation, room history, message posting, thread replies, and event streaming
 - Load existing channels and room history from the server
 - Render sender display names in the transcript and thread view when the backend provides them

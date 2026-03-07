@@ -23,9 +23,13 @@ test("renderHomePage includes service and user bootstrap sections", () => {
   assert.match(html, /function escapeClientHtml\(value\)/);
   assert.match(html, /function enterChatWithToken\(token\)/);
   assert.match(html, /function validateTokenOrWarn\(accessToken\)/);
+  assert.match(html, /function renderIdentityOutput\(payload\)/);
+  assert.match(html, /function bindIdentityOutputToggles\(\)/);
+  assert.match(html, /data-detail-toggle='identity-details'/);
+  assert.match(html, /Hide detail/);
   assert.match(html, /\/api\/session\/validate/);
-  assert.match(html, /escapeClientHtml\(formatJson\(payload\.user\)\)/);
-  assert.match(html, /escapeClientHtml\(formatJson\(payload\.token\)\)/);
+  assert.match(html, /escapeClientHtml\(String\(payload\?\.token\?\.token \|\| ""\)\)/);
+  assert.match(html, /<strong>Token metadata<\/strong>/);
 });
 
 test("renderChatPage includes dedicated chat workflow sections", () => {
