@@ -4,8 +4,8 @@ from pathlib import Path
 
 import yaml
 
+from app.api.openapi import build_openapi_document
 from app.main import create_app
-from app.openapi import build_openapi_document
 
 
 def main() -> None:
