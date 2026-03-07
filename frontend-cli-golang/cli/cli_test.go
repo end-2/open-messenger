@@ -262,6 +262,25 @@ func TestContextPrintsRootAndReplies(t *testing.T) {
 	}
 }
 
+func TestTokenCommandStripsTokenPrefix(t *testing.T) {
+	ctx, lines := newContext(&mockClient{})
+
+	// Simulate user copying "token=<value>" from bootstrap output
+	keepRunning, err := cli.ExecuteCommand(ctx, "token token=my-secret")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !keepRunning {
+		t.Error("expected keepRunning=true")
+	}
+	if ctx.State.AccessToken != "my-secret" {
+		t.Errorf("AccessToken = %q, want %q (token= prefix should be stripped)", ctx.State.AccessToken, "my-secret")
+	}
+	if len(*lines) == 0 || (*lines)[0] != "access token updated" {
+		t.Errorf("unexpected output: %v", *lines)
+	}
+}
+
 func TestExitReturnsFalse(t *testing.T) {
 	ctx, _ := newContext(&mockClient{})
 	keepRunning, err := cli.ExecuteCommand(ctx, "exit")

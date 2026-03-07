@@ -175,7 +175,7 @@ func ExecuteCommand(ctx CommandContext, inputLine string) (bool, error) {
 		if len(args) == 0 {
 			return true, fmt.Errorf("usage: token <access-token>")
 		}
-		state.AccessToken = args[0]
+		state.AccessToken = strings.TrimPrefix(args[0], "token=")
 		writeLine("access token updated")
 		return true, nil
 
