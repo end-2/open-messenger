@@ -304,6 +304,9 @@ function renderBasePage(title: string, bodyClass: string, content: string): stri
       .channel-list {
         min-height: 0;
         overflow: auto;
+        display: grid;
+        grid-auto-rows: minmax(72px, 72px);
+        align-content: start;
       }
       .chat-layout {
         grid-template-columns: 300px minmax(0, 1fr);
@@ -429,10 +432,21 @@ function renderBasePage(title: string, bodyClass: string, content: string): stri
         font-weight: 700;
       }
       .channel-item {
+        display: grid;
+        align-content: center;
+        gap: 6px;
+        min-height: 72px;
         background: rgba(255,255,255,0.06);
         border: 1px solid transparent;
         border-radius: 16px;
         padding: 12px 14px;
+        overflow: hidden;
+      }
+      .channel-item strong,
+      .channel-item .hint {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
       .channel-item.active {
         background: rgba(255,255,255,0.14);
@@ -1069,12 +1083,16 @@ export function renderChatPage(): string {
       }
       function sortChannelsForSidebar(items) {
         return [...items].sort((left, right) => {
+          const byName = String(left?.name || "").localeCompare(String(right?.name || ""));
+          if (byName !== 0) {
+            return byName;
+          }
           const leftCreatedAt = Date.parse(String(left?.created_at || ""));
           const rightCreatedAt = Date.parse(String(right?.created_at || ""));
           if (!Number.isNaN(leftCreatedAt) && !Number.isNaN(rightCreatedAt) && leftCreatedAt !== rightCreatedAt) {
-            return rightCreatedAt - leftCreatedAt;
+            return leftCreatedAt - rightCreatedAt;
           }
-          return String(left?.name || "").localeCompare(String(right?.name || ""));
+          return String(left?.channel_id || "").localeCompare(String(right?.channel_id || ""));
         });
       }
       function renderChannelList() {
