@@ -6,6 +6,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.api.routes import router as api_router
 from app.config import get_settings
 from app.errors import build_error_payload
+from app.events import EventBus
 from app.rate_limit import SlidingWindowRateLimiter
 from app.storage import build_storage_registry
 
@@ -58,6 +59,7 @@ def create_app() -> FastAPI:
     app.state.settings = settings
     app.state.content_store = content_store
     app.state.metadata_store = metadata_store
+    app.state.event_bus = EventBus()
     app.state.rate_limiter = SlidingWindowRateLimiter(
         max_requests=settings.rate_limit_max_requests,
         window_seconds=settings.rate_limit_window_seconds,

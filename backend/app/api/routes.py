@@ -5,12 +5,13 @@ import json
 import logging
 import re
 import secrets
+from asyncio import Queue, TimeoutError, wait_for
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal, Optional
 
 from fastapi import APIRouter, Depends, File, Form, Query, Request, Response, UploadFile, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.auth import (
@@ -21,12 +22,21 @@ from app.auth import (
     sha256_hexdigest,
 )
 from app.config import Settings, get_settings
-from app.domain import Channel, FileObject, Message, MessageContent, Thread, Token, User
+from app.domain import Channel, EventLog, FileObject, Message, MessageContent, Thread, Token, User
 from app.errors import api_error
 from app.utils import new_prefixed_ulid, utc_now_iso8601
 
 router = APIRouter()
 audit_logger = logging.getLogger("open_messenger.audit")
+EVENT_TYPES = frozenset(
+    {
+        "message.created",
+        "message.updated",
+        "message.deleted",
+        "thread.created",
+        "file.uploaded",
+    }
+)
 
 
 class CreateChannelRequest(BaseModel):
@@ -126,6 +136,13 @@ class FileObjectResponse(BaseModel):
     created_at: str
 
 
+class EventResponse(BaseModel):
+    event_id: str
+    type: str
+    occurred_at: str
+    data: dict[str, Any]
+
+
 class SlackPostMessageRequest(BaseModel):
     channel: str = Field(min_length=1)
     text: str = Field(min_length=1)
@@ -172,6 +189,37 @@ def _build_file_response(stored: dict[str, Any]) -> dict[str, Any]:
         "sha256": str(stored.get("sha256", "")),
         "created_at": str(stored.get("created_at", "")),
     }
+
+
+def _build_event(event_type: str, occurred_at: str, data: dict[str, Any]) -> dict[str, Any]:
+    if event_type not in EVENT_TYPES:
+        raise ValueError(f"Unsupported event type: {event_type}")
+    return EventLog(
+        event_id=_new_id("evt"),
+        type=event_type,
+        occurred_at=occurred_at,
+        data=data,
+    ).to_dict()
+
+
+async def _publish_event(
+    request: Request,
+    *,
+    event_type: str,
+    occurred_at: str,
+    data: dict[str, Any],
+) -> dict[str, Any]:
+    event = _build_event(event_type, occurred_at, data)
+    await request.app.state.event_bus.publish(event)
+    return event
+
+
+def _format_sse_event(event: dict[str, Any]) -> str:
+    return (
+        f"id: {event['event_id']}\n"
+        f"event: {event['type']}\n"
+        f"data: {json.dumps(event, ensure_ascii=True, separators=(',', ':'))}\n\n"
+    )
 
 
 def _unix_timestamp_seconds(iso_timestamp: str) -> int:
@@ -300,6 +348,7 @@ async def _store_uploaded_file(
 
 
 async def _ensure_thread_for_root_message(
+    request: Request,
     metadata_store: Any,
     channel_id: str,
     root_message_id: str,
@@ -326,10 +375,23 @@ async def _ensure_thread_for_root_message(
         last_message_at=str(root_message.get("created_at", now)),
         created_at=now,
     ).to_dict()
-    return await metadata_store.create_thread(thread)
+    created_thread = await metadata_store.create_thread(thread)
+    await _publish_event(
+        request,
+        event_type="thread.created",
+        occurred_at=str(created_thread["created_at"]),
+        data={
+            "channel_id": str(created_thread["channel_id"]),
+            "thread_id": str(created_thread["thread_id"]),
+            "root_message_id": str(created_thread["root_message_id"]),
+            "reply_count": int(created_thread["reply_count"]),
+        },
+    )
+    return created_thread
 
 
 async def _resolve_reply_thread_from_external_message(
+    request: Request,
     metadata_store: Any,
     origin: str,
     channel_id: str,
@@ -370,7 +432,12 @@ async def _resolve_reply_thread_from_external_message(
             )
         return internal_message, thread
 
-    thread = await _ensure_thread_for_root_message(metadata_store, channel_id, str(internal_message["message_id"]))
+    thread = await _ensure_thread_for_root_message(
+        request,
+        metadata_store,
+        channel_id,
+        str(internal_message["message_id"]),
+    )
     return internal_message, thread
 
 
@@ -564,6 +631,39 @@ async def _increment_thread_reply(
     return updated
 
 
+@router.get("/v1/events/stream")
+async def stream_events(
+    request: Request,
+    _: AuthContext = Depends(require_scopes(["messages:read"])),
+) -> StreamingResponse:
+    event_bus = request.app.state.event_bus
+    queue: Queue[dict[str, Any]] = await event_bus.subscribe()
+
+    async def event_stream():
+        yield ": connected\n\n"
+        try:
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    event = await wait_for(queue.get(), timeout=15)
+                except TimeoutError:
+                    yield ": keep-alive\n\n"
+                    continue
+                yield _format_sse_event(event)
+        finally:
+            await event_bus.unsubscribe(queue)
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        },
+    )
+
+
 @router.get("/healthz")
 def healthz() -> dict[str, str]:
     return {"status": "ok"}
@@ -673,6 +773,20 @@ async def create_channel_message(
     )
     if payload.thread_id is not None and created:
         await _increment_thread_reply(metadata_store, payload.thread_id, occurred_at)
+    if created:
+        await _publish_event(
+            request,
+            event_type="message.created",
+            occurred_at=occurred_at,
+            data={
+                "channel_id": channel_id,
+                "thread_id": message_response["thread_id"],
+                "message_id": message_response["message_id"],
+                "sender_user_id": message_response["sender_user_id"],
+                "compat_origin": message_response["compat_origin"],
+                "attachments": message_response["attachments"],
+            },
+        )
     if not created:
         response.status_code = status.HTTP_200_OK
     return message_response
@@ -763,7 +877,19 @@ async def create_channel_thread(
         last_message_at=str(root_message.get("created_at", now)),
         created_at=now,
     ).to_dict()
-    return await metadata_store.create_thread(thread)
+    created_thread = await metadata_store.create_thread(thread)
+    await _publish_event(
+        request,
+        event_type="thread.created",
+        occurred_at=str(created_thread["created_at"]),
+        data={
+            "channel_id": str(created_thread["channel_id"]),
+            "thread_id": str(created_thread["thread_id"]),
+            "root_message_id": str(created_thread["root_message_id"]),
+            "reply_count": int(created_thread["reply_count"]),
+        },
+    )
+    return created_thread
 
 
 @router.post(
@@ -808,6 +934,19 @@ async def create_thread_message(
     )
     if created:
         await _increment_thread_reply(metadata_store, thread_id, occurred_at)
+        await _publish_event(
+            request,
+            event_type="message.created",
+            occurred_at=occurred_at,
+            data={
+                "channel_id": channel_id,
+                "thread_id": thread_id,
+                "message_id": message_response["message_id"],
+                "sender_user_id": message_response["sender_user_id"],
+                "compat_origin": message_response["compat_origin"],
+                "attachments": message_response["attachments"],
+            },
+        )
     else:
         response.status_code = status.HTTP_200_OK
     return message_response
@@ -826,6 +965,18 @@ async def upload_file(
     settings: Settings = request.app.state.settings
     metadata_store = request.app.state.metadata_store
     stored = await _store_uploaded_file(settings, metadata_store, file, context.user_id)
+    await _publish_event(
+        request,
+        event_type="file.uploaded",
+        occurred_at=str(stored["created_at"]),
+        data={
+            "file_id": str(stored["file_id"]),
+            "uploader_user_id": str(stored["uploader_user_id"]),
+            "filename": str(stored["filename"]),
+            "mime_type": str(stored["mime_type"]),
+            "size_bytes": int(stored["size_bytes"]),
+        },
+    )
     return _build_file_response(stored)
 
 
@@ -885,6 +1036,7 @@ async def slack_chat_post_message(
             resolved_thread_id = str(thread_mapping["internal_id"])
         else:
             _, thread = await _resolve_reply_thread_from_external_message(
+                request,
                 metadata_store,
                 origin="slack",
                 channel_id=payload.channel,
@@ -915,6 +1067,20 @@ async def slack_chat_post_message(
     )
     if resolved_thread_id is not None and created:
         await _increment_thread_reply(metadata_store, resolved_thread_id, occurred_at)
+    if created:
+        await _publish_event(
+            request,
+            event_type="message.created",
+            occurred_at=occurred_at,
+            data={
+                "channel_id": payload.channel,
+                "thread_id": resolved_thread_id,
+                "message_id": message_response["message_id"],
+                "sender_user_id": message_response["sender_user_id"],
+                "compat_origin": message_response["compat_origin"],
+                "attachments": message_response["attachments"],
+            },
+        )
 
     sequence = await metadata_store.next_compat_sequence("slack", payload.channel)
     message_ts = _slack_ts_from_sequence(sequence, occurred_at)
@@ -958,10 +1124,23 @@ async def slack_files_upload(
     await _get_channel_or_404(metadata_store, channel_id)
 
     stored_file = await _store_uploaded_file(settings, metadata_store, file, context.user_id)
+    await _publish_event(
+        request,
+        event_type="file.uploaded",
+        occurred_at=str(stored_file["created_at"]),
+        data={
+            "file_id": str(stored_file["file_id"]),
+            "uploader_user_id": str(stored_file["uploader_user_id"]),
+            "filename": str(stored_file["filename"]),
+            "mime_type": str(stored_file["mime_type"]),
+            "size_bytes": int(stored_file["size_bytes"]),
+        },
+    )
 
     resolved_thread_id: str | None = None
     if thread_ts is not None:
         _, thread = await _resolve_reply_thread_from_external_message(
+            request,
             metadata_store,
             origin="slack",
             channel_id=channel_id,
@@ -993,6 +1172,20 @@ async def slack_files_upload(
     )
     if resolved_thread_id is not None and created:
         await _increment_thread_reply(metadata_store, resolved_thread_id, occurred_at)
+    if created:
+        await _publish_event(
+            request,
+            event_type="message.created",
+            occurred_at=occurred_at,
+            data={
+                "channel_id": channel_id,
+                "thread_id": resolved_thread_id,
+                "message_id": message_response["message_id"],
+                "sender_user_id": message_response["sender_user_id"],
+                "compat_origin": message_response["compat_origin"],
+                "attachments": message_response["attachments"],
+            },
+        )
 
     sequence = await metadata_store.next_compat_sequence("slack", channel_id)
     message_ts = _slack_ts_from_sequence(sequence, occurred_at)
@@ -1037,6 +1230,7 @@ async def telegram_send_message(
     resolved_thread_id: str | None = None
     if payload.reply_to_message_id is not None:
         _, thread = await _resolve_reply_thread_from_external_message(
+            request,
             metadata_store,
             origin="telegram",
             channel_id=payload.chat_id,
@@ -1059,6 +1253,20 @@ async def telegram_send_message(
     )
     if resolved_thread_id is not None and created:
         await _increment_thread_reply(metadata_store, resolved_thread_id, occurred_at)
+    if created:
+        await _publish_event(
+            request,
+            event_type="message.created",
+            occurred_at=occurred_at,
+            data={
+                "channel_id": payload.chat_id,
+                "thread_id": resolved_thread_id,
+                "message_id": message_response["message_id"],
+                "sender_user_id": message_response["sender_user_id"],
+                "compat_origin": message_response["compat_origin"],
+                "attachments": message_response["attachments"],
+            },
+        )
 
     external_message_id = str(await metadata_store.next_compat_sequence("telegram", payload.chat_id))
     await _register_compat_mapping(
@@ -1096,10 +1304,23 @@ async def telegram_send_document(
 
     await _get_channel_or_404(metadata_store, chat_id)
     stored_file = await _store_uploaded_file(settings, metadata_store, document, context.user_id)
+    await _publish_event(
+        request,
+        event_type="file.uploaded",
+        occurred_at=str(stored_file["created_at"]),
+        data={
+            "file_id": str(stored_file["file_id"]),
+            "uploader_user_id": str(stored_file["uploader_user_id"]),
+            "filename": str(stored_file["filename"]),
+            "mime_type": str(stored_file["mime_type"]),
+            "size_bytes": int(stored_file["size_bytes"]),
+        },
+    )
 
     resolved_thread_id: str | None = None
     if reply_to_message_id is not None:
         _, thread = await _resolve_reply_thread_from_external_message(
+            request,
             metadata_store,
             origin="telegram",
             channel_id=chat_id,
@@ -1122,6 +1343,20 @@ async def telegram_send_document(
     )
     if resolved_thread_id is not None and created:
         await _increment_thread_reply(metadata_store, resolved_thread_id, occurred_at)
+    if created:
+        await _publish_event(
+            request,
+            event_type="message.created",
+            occurred_at=occurred_at,
+            data={
+                "channel_id": chat_id,
+                "thread_id": resolved_thread_id,
+                "message_id": message_response["message_id"],
+                "sender_user_id": message_response["sender_user_id"],
+                "compat_origin": message_response["compat_origin"],
+                "attachments": message_response["attachments"],
+            },
+        )
 
     external_message_id = str(await metadata_store.next_compat_sequence("telegram", chat_id))
     await _register_compat_mapping(
@@ -1207,10 +1442,23 @@ async def discord_create_message(
                 "url": f"/v1/files/{stored_file['file_id']}",
             }
         )
+        await _publish_event(
+            request,
+            event_type="file.uploaded",
+            occurred_at=str(stored_file["created_at"]),
+            data={
+                "file_id": str(stored_file["file_id"]),
+                "uploader_user_id": str(stored_file["uploader_user_id"]),
+                "filename": str(stored_file["filename"]),
+                "mime_type": str(stored_file["mime_type"]),
+                "size_bytes": int(stored_file["size_bytes"]),
+            },
+        )
 
     resolved_thread_id: str | None = None
     if external_reference_id is not None:
         _, thread = await _resolve_reply_thread_from_external_message(
+            request,
             metadata_store,
             origin="discord",
             channel_id=channel_id,
@@ -1234,6 +1482,20 @@ async def discord_create_message(
     )
     if resolved_thread_id is not None and created:
         await _increment_thread_reply(metadata_store, resolved_thread_id, occurred_at)
+    if created:
+        await _publish_event(
+            request,
+            event_type="message.created",
+            occurred_at=occurred_at,
+            data={
+                "channel_id": channel_id,
+                "thread_id": resolved_thread_id,
+                "message_id": message_response["message_id"],
+                "sender_user_id": message_response["sender_user_id"],
+                "compat_origin": message_response["compat_origin"],
+                "attachments": message_response["attachments"],
+            },
+        )
 
     external_message_id = _discord_message_id_from_sequence(
         await metadata_store.next_compat_sequence("discord", channel_id),

@@ -43,6 +43,7 @@ Optional: tighten or disable rate limiting during local runs:
 
 - `curl http://localhost:8000/healthz`
 - `curl http://localhost:8000/v1/info`
+- `curl -N http://localhost:8000/v1/events/stream -H "Authorization: Bearer <token>"`
 - `curl -X POST http://localhost:8000/v1/channels -H "Content-Type: application/json" -H "Authorization: Bearer <token>" -d '{"name":"general"}'`
 - `curl -X POST http://localhost:8000/v1/channels/<channel_id>/threads -H "Content-Type: application/json" -H "Authorization: Bearer <token>" -d '{"root_message_id":"<message_id>"}'`
 - `curl -X POST http://localhost:8000/admin/v1/users -H "Content-Type: application/json" -H "X-Admin-Token: dev-admin-token" -d '{"username":"alice"}'`

@@ -308,6 +308,12 @@ Base path: `/admin/v1`
 - WebSocket: 양방향 인터랙션
 - SSE: 서버 -> 클라이언트 단방향 스트림 (AI Agent 친화)
 
+초기 구현 범위:
+
+- `GET /v1/events/stream` SSE 엔드포인트 제공
+- 표준 이벤트 스키마를 사용해 `message.created`, `thread.created`, `file.uploaded` 발행
+- `message.updated`, `message.deleted`, WebSocket 게이트웨이는 후속 단계에서 확장
+
 이벤트 페이로드 표준:
 
 ```json

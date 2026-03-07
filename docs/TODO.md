@@ -73,11 +73,11 @@
 
 ## 8. 실시간 이벤트
 
-- [ ] 이벤트 타입 정의: `message.created`, `message.updated`, `message.deleted`, `thread.created`, `file.uploaded`
-- [ ] 이벤트 발행 파이프라인 구현
-- [ ] SSE 엔드포인트 구현: `GET /v1/events/stream`
+- [x] 이벤트 타입 정의: `message.created`, `message.updated`, `message.deleted`, `thread.created`, `file.uploaded`
+- [x] 이벤트 발행 파이프라인 구현
+- [x] SSE 엔드포인트 구현: `GET /v1/events/stream`
 - [ ] WebSocket 게이트웨이 구현
-- [ ] 이벤트 페이로드 표준 스키마 적용 (`event_id`, `type`, `occurred_at`, `data`)
+- [x] 이벤트 페이로드 표준 스키마 적용 (`event_id`, `type`, `occurred_at`, `data`)
 
 ## 9. 파일 첨부
 
