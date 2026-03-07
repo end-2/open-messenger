@@ -355,6 +355,24 @@ def run_matrix_scenario(base_url: str, admin_token: str) -> None:
             channels[alias] = str(payload["channel_id"])
             channel_alias_by_id[str(payload["channel_id"])] = alias
 
+        listed_channels = request(
+            client,
+            "GET",
+            "/v1/channels",
+            200,
+            headers=actors["erin"].headers,
+        ).json()
+        listed_channel_aliases = [
+            channel_alias_by_id[str(item["channel_id"])]
+            for item in listed_channels["items"]
+            if str(item["channel_id"]) in channel_alias_by_id
+        ]
+        assert_matches(
+            "channel list aliases",
+            listed_channel_aliases,
+            ["ops", "release", "staging"],
+        )
+
         request(
             client,
             "POST",

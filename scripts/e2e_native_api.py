@@ -134,6 +134,20 @@ def run(base_url: str, admin_token: str) -> NativeApiStorageArtifacts:
             json={"name": "e2e-general"},
         )
         channel_id = channel_response.json()["channel_id"]
+        listed_channels = _request(
+            client,
+            "GET",
+            "/v1/channels",
+            200,
+            headers=native_headers,
+        ).json()
+        _expect(
+            any(
+                item["channel_id"] == channel_id and item["name"] == "e2e-general"
+                for item in listed_channels["items"]
+            ),
+            "Created channel missing from channel list response",
+        )
 
         message_payload = {
             "text": "hello from e2e",

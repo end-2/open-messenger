@@ -127,7 +127,10 @@ class MySQLMetadataStore(MetadataStore):
 
     async def list_channels(self) -> list[dict[str, Any]]:
         rows = await self._run_fetchall(
-            f"SELECT payload FROM {self._table('channels')} ORDER BY created_at ASC, entity_id ASC",
+            f"""
+            SELECT payload FROM {self._table('channels')}
+            ORDER BY JSON_UNQUOTE(JSON_EXTRACT(payload, '$.created_at')) ASC, entity_id ASC
+            """,
         )
         channels: list[dict[str, Any]] = []
         for row in rows:
