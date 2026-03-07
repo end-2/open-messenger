@@ -125,6 +125,17 @@ class MySQLMetadataStore(MetadataStore):
         )
         return self._deserialize_row(row)
 
+    async def list_channels(self) -> list[dict[str, Any]]:
+        rows = await self._run_fetchall(
+            f"SELECT payload FROM {self._table('channels')} ORDER BY created_at ASC, entity_id ASC",
+        )
+        channels: list[dict[str, Any]] = []
+        for row in rows:
+            channel = self._deserialize_row(row)
+            if channel is not None:
+                channels.append(channel)
+        return channels
+
     async def delete_channel(self, channel_id: str) -> dict[str, Any] | None:
         channel = await self.get_channel(channel_id)
         if channel is None:

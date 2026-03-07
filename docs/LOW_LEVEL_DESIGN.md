@@ -144,6 +144,7 @@ Message responses resolve sender identity fields from the stored user record and
 
 Representative endpoints:
 
+- `GET /channels`
 - `POST /channels`
 - `GET /channels/{channel_id}`
 - `POST /channels/{channel_id}/messages`

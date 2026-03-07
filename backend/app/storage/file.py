@@ -122,6 +122,13 @@ class FileMetadataStore(MetadataStore):
             return None
         return deepcopy(record)
 
+    async def list_channels(self) -> list[dict[str, Any]]:
+        with self._lock:
+            database = self._read_database()
+            channels = list(database["channels"].values())
+        channels.sort(key=lambda channel: str(channel.get("created_at", "")))
+        return [deepcopy(channel) for channel in channels]
+
     async def delete_channel(self, channel_id: str) -> dict[str, Any] | None:
         with self._lock:
             database = self._read_database()

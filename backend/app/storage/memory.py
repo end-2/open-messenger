@@ -83,6 +83,13 @@ class InMemoryMetadataStore(MetadataStore):
             return None
         return deepcopy(channel)
 
+    async def list_channels(self) -> list[dict[str, Any]]:
+        channels = sorted(
+            self._channels.values(),
+            key=lambda channel: str(channel.get("created_at", "")),
+        )
+        return [deepcopy(channel) for channel in channels]
+
     async def delete_channel(self, channel_id: str) -> dict[str, Any] | None:
         channel = self._channels.pop(channel_id, None)
         if channel is None:

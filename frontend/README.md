@@ -7,7 +7,7 @@ This frontend is a lightweight TypeScript BFF and browser console for the docume
 - Inspect `/v1/info` service metadata
 - Bootstrap a user and plaintext token through `/admin/v1/users` and `/admin/v1/tokens`
 - Open a dedicated chat page for channel creation, room history, message posting, thread replies, and event streaming
-- Load channel messages
+- Load existing channels and room history from the server
 - Render sender display names in the transcript and thread view when the backend provides them
 - Keep the thread sidebar hidden until a message opens it, with a conventional chat-room style sidebar, transcript, and composer layout
 - Keep the main room transcript focused on root-level room messages while thread replies stay in the thread sidebar, and avoid exposing internal IDs in the room UI

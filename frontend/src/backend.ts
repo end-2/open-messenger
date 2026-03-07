@@ -33,6 +33,10 @@ export type FrontendChannel = {
   created_at: string;
 };
 
+export type FrontendChannelList = {
+  items: FrontendChannel[];
+};
+
 export type FrontendThread = {
   thread_id: string;
   channel_id: string;
@@ -156,6 +160,13 @@ export class BackendClient {
       method: "POST",
       accessToken,
       body: { name }
+    });
+  }
+
+  async listChannels(accessToken: string): Promise<FrontendChannelList> {
+    return this.request<FrontendChannelList>("/v1/channels", {
+      method: "GET",
+      accessToken
     });
   }
 

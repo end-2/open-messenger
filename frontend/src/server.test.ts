@@ -254,3 +254,51 @@ test("frontend server validates session tokens", async () => {
     });
   }
 });
+
+test("frontend server proxies channel list route", async () => {
+  const server = createFrontendServer(
+    {
+      listChannels: async (accessToken: string) => {
+        assert.equal(accessToken, "token");
+        return {
+          items: [
+            {
+              channel_id: "ch_1",
+              name: "general",
+              created_at: "2026-03-07T00:00:00Z"
+            }
+          ]
+        };
+      }
+    },
+    {
+      home: "<html><body>home</body></html>",
+      chat: "<html><body>chat</body></html>"
+    }
+  );
+
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+
+  try {
+    const address = server.address();
+    assert(address && typeof address === "object");
+    const response = await fetch(`http://127.0.0.1:${address.port}/api/channels/list`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ accessToken: "token" })
+    });
+
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).items[0].channel_id, "ch_1");
+  } finally {
+    await new Promise<void>((resolve, reject) => {
+      server.close((error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve();
+      });
+    });
+  }
+});

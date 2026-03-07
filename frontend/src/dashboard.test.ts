@@ -53,6 +53,8 @@ test("renderChatPage includes dedicated chat workflow sections", () => {
   assert.match(html, /function formatIdentityLabel\(identity\)/);
   assert.match(html, /function decodeCurrentUserId\(\)/);
   assert.match(html, /function toggleThreadSidebar\(isOpen\)/);
+  assert.match(html, /async function loadChannels\(preferredChannelId = ""\)/);
+  assert.match(html, /fetch\("\/api\/channels\/list"/);
   assert.match(html, /function validateChatAccessOrRedirect\(\)/);
   assert.match(html, /unvalid token/);
   assert.match(html, /Open chat from the main page after entering a token\./);
@@ -61,6 +63,7 @@ test("renderChatPage includes dedicated chat workflow sections", () => {
   assert.match(html, /message-row/);
   assert.match(html, /thread-trigger/);
   assert.doesNotMatch(html, /\.message-card\.own \.message-author \{\s*flex-direction: row-reverse;/);
+  assert.doesNotMatch(html, /Rooms stay in local storage for quick re-entry\./);
   assert.match(html, /Open the room to read messages and start threads\./);
   assert.doesNotMatch(html, /channel message/);
   assert.match(html, /escapeClientHtml\(event\.data\)/);

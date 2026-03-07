@@ -39,6 +39,7 @@ from .schemas import (
     CreateMessageRequest,
     CreateThreadRequest,
     FileObjectResponse,
+    ListChannelsResponse,
     ListMessagesResponse,
     MessageResponse,
     NativeCreateMessageRequest,
@@ -220,6 +221,16 @@ async def create_channel(
         name=payload.name,
     ).to_dict()
     return await metadata_store.create_channel(channel)
+
+
+@router.get("/v1/channels", response_model=ListChannelsResponse)
+async def list_channels(
+    request: Request,
+    _: AuthContext = Depends(require_scopes(["channels:read"])),
+) -> dict[str, Any]:
+    metadata_store = request.app.state.metadata_store
+    channels = await metadata_store.list_channels()
+    return {"items": channels}
 
 
 @router.get("/v1/channels/{channel_id}", response_model=ChannelResponse)

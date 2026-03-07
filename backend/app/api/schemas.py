@@ -15,6 +15,10 @@ class ChannelResponse(BaseModel):
     created_at: str
 
 
+class ListChannelsResponse(BaseModel):
+    items: list[ChannelResponse]
+
+
 class CreateThreadRequest(BaseModel):
     root_message_id: str = Field(min_length=1)
 

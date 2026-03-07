@@ -733,7 +733,7 @@ export function renderChatPage(): string {
                 <p class="sidebar-section-title" style="margin-bottom:0;">Rooms</p>
                 <button type="button" class="ghost" id="refresh-messages">Refresh</button>
               </div>
-              <p class="hint" style="margin:0;">Rooms stay in local storage for quick re-entry.</p>
+              <p class="hint" style="margin:0;">Rooms are loaded from the server.</p>
               <ul class="card-list channel-list" id="channel-list"></ul>
             </div>
             <section class="panel stream-panel" style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.08); box-shadow:none; padding:16px;">
@@ -826,6 +826,7 @@ export function renderChatPage(): string {
       const streamStatus = document.querySelector("#stream-status");
       const eventFeed = document.querySelector("#event-feed");
       let activeChannel = null;
+      let channels = [];
       let activeThread = null;
       let eventSource = null;
       let accessToken = "";
@@ -880,31 +881,13 @@ export function renderChatPage(): string {
           return null;
         }
       }
-      function readStoredChannels() {
-        try {
-          const channels = JSON.parse(localStorage.getItem("openMessenger.channels") || "[]");
-          return Array.isArray(channels) ? channels : [];
-        } catch {
-          return [];
-        }
-      }
-      function writeStoredChannels(channels) {
-        localStorage.setItem("openMessenger.channels", JSON.stringify(channels));
-      }
       function getAccessToken() {
         return accessToken;
       }
-      function addOrUpdateChannel(channel) {
-        const channels = readStoredChannels();
-        const nextChannels = [channel, ...channels.filter((item) => item.channel_id !== channel.channel_id)].slice(0, 12);
-        writeStoredChannels(nextChannels);
-        renderChannelList();
-      }
       function renderChannelList() {
-        const channels = readStoredChannels();
         channelList.innerHTML = "";
         if (channels.length === 0) {
-          channelList.innerHTML = "<li><strong>No rooms yet.</strong><div class='hint'>Create one to start chatting.</div></li>";
+          channelList.innerHTML = "<li><strong>No rooms yet.</strong><div class='hint'>Create one on the server to start chatting.</div></li>";
           return;
         }
         for (const channel of channels) {
@@ -922,6 +905,39 @@ export function renderChatPage(): string {
             void loadMessages();
           });
           channelList.appendChild(item);
+        }
+      }
+      async function loadChannels(preferredChannelId = "") {
+        const accessToken = getAccessToken();
+        if (!accessToken) {
+          setStatus(sessionStatus, "An access token is required.");
+          return;
+        }
+        setStatus(channelStatus, "Loading rooms...");
+        try {
+          const response = await fetch("/api/channels/list", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ accessToken })
+          });
+          const payload = await response.json();
+          if (!response.ok) {
+            throw new Error(formatJson(payload));
+          }
+          channels = Array.isArray(payload.items) ? payload.items : [];
+          if (activeChannel) {
+            activeChannel = channels.find((channel) => channel.channel_id === activeChannel.channel_id) || null;
+          }
+          if (!activeChannel && preferredChannelId) {
+            activeChannel = channels.find((channel) => channel.channel_id === preferredChannelId) || null;
+          }
+          renderChannelList();
+          if (activeChannel) {
+            setActiveChannel(activeChannel);
+          }
+          setStatus(channelStatus, "Rooms loaded.", true);
+        } catch (error) {
+          setStatus(channelStatus, error instanceof Error ? error.message : "Unknown error");
         }
       }
       function setActiveChannel(channel) {
@@ -1147,7 +1163,7 @@ export function renderChatPage(): string {
           if (!response.ok) {
             throw new Error(formatJson(payload));
           }
-          addOrUpdateChannel(payload);
+          await loadChannels(payload.channel_id);
           setActiveChannel(payload);
           channelForm.reset();
           setStatus(channelStatus, "Channel created.", true);
@@ -1231,8 +1247,9 @@ export function renderChatPage(): string {
           setStatus(threadStatus, error instanceof Error ? error.message : "Unknown error");
         }
       });
-      refreshMessagesButton.addEventListener("click", () => {
-        void loadMessages();
+      refreshMessagesButton.addEventListener("click", async () => {
+        await loadChannels(activeChannel?.channel_id || "");
+        await loadMessages();
       });
       closeThreadButton.addEventListener("click", () => {
         activeThread = null;
@@ -1273,10 +1290,9 @@ export function renderChatPage(): string {
         if (!(await validateChatAccessOrRedirect())) {
           return;
         }
-        renderChannelList();
+        await loadChannels();
         renderThreadPanel();
         toggleThreadSidebar(false);
-        const channels = readStoredChannels();
         if (channels.length > 0) {
           setActiveChannel(channels[0]);
           await loadMessages();

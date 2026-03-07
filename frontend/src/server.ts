@@ -85,6 +85,13 @@ export function createFrontendServer(client: BackendClient, pages: { home: strin
         return;
       }
 
+      if (request.method === "POST" && url.pathname === "/api/channels/list") {
+        const body = await readJson(request);
+        const channels = await client.listChannels(String(body.accessToken ?? ""));
+        sendJson(response, 200, channels);
+        return;
+      }
+
       if (request.method === "POST" && url.pathname === "/api/messages/list") {
         const body = await readJson(request);
         const messages = await client.listMessages(String(body.accessToken ?? ""), String(body.channelId ?? ""));

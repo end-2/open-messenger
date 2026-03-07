@@ -78,6 +78,20 @@ paths:
       tags:
       - System
   /v1/channels:
+    get:
+      summary: List Channels
+      operationId: list_channels_v1_channels_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListChannelsResponse'
+      tags:
+      - Native API
+      security:
+      - BearerToken: []
     post:
       summary: Create Channel
       operationId: create_channel_v1_channels_post
@@ -892,6 +906,17 @@ components:
       - name
       - created_at
       title: ChannelResponse
+    ListChannelsResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/ChannelResponse'
+          type: array
+          title: Items
+      type: object
+      required:
+      - items
+      title: ListChannelsResponse
     CreateChannelRequest:
       properties:
         name:

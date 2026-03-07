@@ -192,3 +192,36 @@ test("BackendClient supports thread workflows", async () => {
   assert.match(calls[0].body ?? "", /msg_root/);
   assert.match(calls[2].body ?? "", /reply/);
 });
+
+test("BackendClient lists channels", async () => {
+  const calls: Array<{ url: string; headers: Headers }> = [];
+  const client = new BackendClient(
+    "http://api.example",
+    "dev-admin-token",
+    async (input, init) => {
+      calls.push({
+        url: String(input),
+        headers: new Headers(init?.headers)
+      });
+      return new Response(
+        JSON.stringify({
+          items: [
+            {
+              channel_id: "ch_1",
+              name: "general",
+              created_at: "2026-03-07T00:00:00Z"
+            }
+          ]
+        }),
+        { status: 200 }
+      );
+    }
+  );
+
+  const result = await client.listChannels("token");
+
+  assert.equal(result.items.length, 1);
+  assert.equal(result.items[0].name, "general");
+  assert.match(calls[0].url, /\/v1\/channels$/);
+  assert.equal(calls[0].headers.get("authorization"), "Bearer token");
+});

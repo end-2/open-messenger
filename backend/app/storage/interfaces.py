@@ -41,6 +41,9 @@ class MetadataStore(Protocol):
     async def get_channel(self, channel_id: str) -> dict[str, Any] | None:
         ...
 
+    async def list_channels(self) -> list[dict[str, Any]]:
+        ...
+
     async def delete_channel(self, channel_id: str) -> dict[str, Any] | None:
         ...
 

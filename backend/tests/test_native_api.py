@@ -110,6 +110,20 @@ def test_create_and_get_channel() -> None:
     assert payload["created_at"]
 
 
+def test_list_channels_returns_existing_server_channels() -> None:
+    client = TestClient(create_app())
+    headers = _issue_bearer_headers(client)
+    first_channel_id = _create_channel(client, headers, name="general")
+    second_channel_id = _create_channel(client, headers, name="random")
+
+    response = client.get("/v1/channels", headers=headers)
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert [item["channel_id"] for item in payload["items"]] == [first_channel_id, second_channel_id]
+    assert [item["name"] for item in payload["items"]] == ["general", "random"]
+
+
 def test_post_and_list_channel_messages_with_cursor() -> None:
     client = TestClient(create_app())
     headers = _issue_bearer_headers(client)
