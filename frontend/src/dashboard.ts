@@ -360,6 +360,12 @@ function renderBasePage(title: string, bodyClass: string, content: string): stri
         gap: 10px;
         align-content: start;
       }
+      .message-row {
+        display: flex;
+      }
+      .message-row.own {
+        justify-content: flex-end;
+      }
       .message-card {
         display: grid;
         gap: 8px;
@@ -367,6 +373,17 @@ function renderBasePage(title: string, bodyClass: string, content: string): stri
         border-radius: 18px;
         background: rgba(255,255,255,0.78);
         border: 1px solid rgba(54, 71, 91, 0.08);
+        width: min(40rem, 78%);
+      }
+      .message-card.own {
+        background: linear-gradient(180deg, rgba(208, 87, 47, 0.16), rgba(255,255,255,0.92));
+      }
+      .message-card.own .message-meta,
+      .message-card.own .message-actions {
+        justify-content: flex-end;
+      }
+      .message-card.own .message-author {
+        flex-direction: row-reverse;
       }
       .message-meta {
         display: flex;
@@ -425,6 +442,15 @@ function renderBasePage(title: string, bodyClass: string, content: string): stri
       .thread-close {
         width: auto;
         padding: 10px 12px;
+      }
+      .thread-trigger {
+        width: auto;
+        min-width: 38px;
+        min-height: 38px;
+        padding: 0 10px;
+        border-radius: 999px;
+        font-size: 1rem;
+        line-height: 1;
       }
       .utility-stack {
         display: grid;
@@ -789,6 +815,21 @@ export function renderChatPage(): string {
         const label = formatSenderLabel(message).trim();
         return label ? label.charAt(0).toUpperCase() : "?";
       }
+      function decodeCurrentUserId() {
+        const rawToken = getAccessToken();
+        const parts = rawToken.split(".");
+        if (parts.length !== 3) {
+          return "";
+        }
+        try {
+          const normalized = parts[1].replaceAll("-", "+").replaceAll("_", "/");
+          const padding = "=".repeat((4 - (normalized.length % 4 || 4)) % 4);
+          const payload = JSON.parse(atob(normalized + padding));
+          return typeof payload?.sub === "string" ? payload.sub : "";
+        } catch {
+          return "";
+        }
+      }
       function toggleThreadSidebar(isOpen) {
         threadSidebar.hidden = !isOpen;
         document.querySelector("#chat-layout")?.classList.toggle("thread-open", isOpen);
@@ -863,9 +904,13 @@ export function renderChatPage(): string {
           return;
         }
         for (const item of roomMessages) {
+          const row = document.createElement("div");
+          const isOwnMessage = item.sender_user_id === decodeCurrentUserId();
+          row.className = "message-row" + (isOwnMessage ? " own" : "");
           const bubble = document.createElement("article");
-          bubble.className = "message-card";
-          const threadButtonLabel = item.thread_id ? "Open thread" : "Start thread";
+          bubble.className = "message-card" + (isOwnMessage ? " own" : " other");
+          const threadButtonLabel = item.thread_id ? "↪" : "⋯";
+          const threadButtonTitle = item.thread_id ? "Open thread" : "Start thread";
           bubble.innerHTML = [
             "<div class='message-meta'>",
             "<div class='message-author'>",
@@ -876,8 +921,7 @@ export function renderChatPage(): string {
             "</div>",
             "<p class='preformatted' style='color:var(--text); margin:0;'>" + escapeClientHtml(item.text) + "</p>",
             "<div class='message-actions'>",
-            "<span class='pill'>" + (item.thread_id ? "thread reply" : "channel message") + "</span>",
-            "<button type='button' class='ghost' data-message-id='" + escapeClientHtml(item.message_id) + "' data-thread-id='" + escapeClientHtml(item.thread_id || "") + "'>" + threadButtonLabel + "</button>",
+            "<button type='button' class='ghost thread-trigger' title='" + escapeClientHtml(threadButtonTitle) + "' aria-label='" + escapeClientHtml(threadButtonTitle) + "' data-message-id='" + escapeClientHtml(item.message_id) + "' data-thread-id='" + escapeClientHtml(item.thread_id || "") + "'>" + escapeClientHtml(threadButtonLabel) + "</button>",
             "</div>"
           ].join("");
           const threadButton = bubble.querySelector("button[data-message-id]");
@@ -888,7 +932,8 @@ export function renderChatPage(): string {
               setStatus(threadStatus, error instanceof Error ? error.message : "Unknown error");
             }
           });
-          messageList.appendChild(bubble);
+          row.appendChild(bubble);
+          messageList.appendChild(row);
         }
         messageList.scrollTop = messageList.scrollHeight;
       }
