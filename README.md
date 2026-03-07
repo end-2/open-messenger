@@ -1,6 +1,6 @@
 # Open Messenger
 
-Open Messenger is a monorepo for a multi-channel messaging platform with a FastAPI backend and a Node.js TypeScript frontend console. The chat console supports channel messaging, root-level thread creation, threaded replies, and live event inspection.
+Open Messenger is a monorepo for a multi-channel messaging platform with a FastAPI backend, a Node.js TypeScript frontend console, and an interactive terminal CLI. The chat surfaces support channel messaging, root-level thread creation, threaded replies, and live event inspection.
 
 ## Quick Start
 
@@ -27,6 +27,7 @@ Run local unit tests:
 ```bash
 make test
 cd frontend && npm test
+cd frontend-cli && npm test
 ```
 
 Run end-to-end checks locally:
@@ -49,9 +50,20 @@ Run tests in Docker:
 ```bash
 make test-docker
 make test-frontend-docker
+make test-frontend-cli-docker
 make e2e-docker
 make e2e-matrix-docker
 ```
+
+Run the interactive CLI locally:
+
+```bash
+cd frontend-cli
+npm install
+npm run dev
+```
+
+Useful commands inside the CLI include `bootstrap`, `create-channel`, `use-channel`, `list`, `send`, `thread`, `reply`, and `context`.
 
 The matrix E2E runner provisions multiple users with different scope sets, creates several channels, sends cross-user messages and thread replies, then validates fetched transcripts and thread contexts against embedded expected-answer fixtures.
 

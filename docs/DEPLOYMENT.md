@@ -20,6 +20,8 @@ Frontend workflows:
 
 - Run the frontend console locally with `cd frontend && npm run dev`.
 - Run frontend unit tests locally with `cd frontend && npm test`.
+- Run the interactive CLI locally with `cd frontend-cli && npm install && npm run dev`.
+- Run frontend CLI unit tests locally with `cd frontend-cli && npm test`.
 
 Optional runtime overrides:
 
@@ -45,8 +47,9 @@ Development and verification commands:
 4. Run backend E2E checks in Docker with `make e2e-docker`.
 5. Run the multi-user E2E matrix in Docker with `make e2e-matrix-docker`.
 6. Run frontend unit tests in Docker with `make test-frontend-docker`.
-7. Stop the deployment test stack with `make down`.
-8. Stop the application stack with `make fullstack-down`.
+7. Run frontend CLI unit tests in Docker with `make test-frontend-cli-docker`.
+8. Stop the deployment test stack with `make down`.
+9. Stop the application stack with `make fullstack-down`.
 
 Configuration previews:
 

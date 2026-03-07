@@ -5,7 +5,7 @@ PIP := $(VENV_DIR)/bin/pip
 PYTEST := $(VENV_DIR)/bin/pytest
 UVICORN := $(VENV_DIR)/bin/uvicorn
 
-.PHONY: help venv install run test e2e e2e-matrix test-docker e2e-docker e2e-matrix-docker test-frontend-docker up down fullstack-up fullstack-down deploy-single-config deploy-staging-config deploy-prod-config clean
+.PHONY: help venv install run test e2e e2e-matrix test-docker e2e-docker e2e-matrix-docker test-frontend-docker test-frontend-cli-docker up down fullstack-up fullstack-down deploy-single-config deploy-staging-config deploy-prod-config clean
 
 help:
 	@echo "Available targets:"
@@ -19,6 +19,7 @@ help:
 	@echo "  e2e-docker   Run end-to-end API checks in Docker"
 	@echo "  e2e-matrix-docker Run multi-user end-to-end matrix in Docker"
 	@echo "  test-frontend-docker  Run frontend unit test in Docker"
+	@echo "  test-frontend-cli-docker  Run frontend CLI unit test in Docker"
 	@echo "  up           Start deployment test stack (API, Redis, MySQL, Prometheus, Loki, Tempo, Grafana)"
 	@echo "  down         Stop and remove deployment test stack"
 	@echo "  fullstack-up Start frontend and backend application containers in Docker"
@@ -76,6 +77,9 @@ e2e-matrix-docker:
 
 test-frontend-docker:
 	docker run --rm -v "$$PWD":/workspace -w /workspace/frontend node:22-alpine npm test
+
+test-frontend-cli-docker:
+	docker run --rm -v "$$PWD":/workspace -w /workspace/frontend-cli node:22-alpine npm test
 
 up:
 	docker compose up --build -d api redis mysql prometheus loki promtail tempo grafana
