@@ -7,6 +7,7 @@
 
 - [x] Python 3 백엔드 프로젝트 골격 생성 (`FastAPI`, `Uvicorn`, `asyncio`)
 - [x] Node.js 프론트엔드 프로젝트 골격 생성 (`TypeScript`, `Next.js` 또는 BFF)
+- [x] Node.js TypeScript frontend console implemented as a lightweight BFF with documented Native/Admin API workflows
 - [x] 공통 환경 설정 파일 정의 (`.env`, `config.yaml`, 실행 프로파일)
 - [x] 로컬 개발용 기본 실행 스크립트 구성 (`make`, `npm scripts`)
 

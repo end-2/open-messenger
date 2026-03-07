@@ -1,11 +1,11 @@
 # Open Messenger
 
-Baseline monorepo scaffold for the Open Messenger platform.
+Monorepo for the Open Messenger platform, with a FastAPI backend and a Node.js TypeScript frontend console.
 
 ## Project Structure
 
 - `backend/`: Python FastAPI API server
-- `frontend/`: Node.js frontend placeholder structure
+- `frontend/`: Node.js TypeScript frontend console and BFF
 - `docs/`: Design and implementation tracking documents
 - `Dockerfile`: API container image definition
 - `docker-compose.yml`: Local deployment and containerized test environment
@@ -16,6 +16,7 @@ Baseline monorepo scaffold for the Open Messenger platform.
 ## Prerequisites
 
 - Python 3.12+
+- Node.js 22+
 - Docker Engine with Compose plugin
 
 ## Local Setup (venv)
@@ -34,6 +35,20 @@ Run unit tests in local virtual environment:
 
 ```bash
 make test
+```
+
+Run the frontend console locally:
+
+```bash
+cd frontend
+npm run dev
+```
+
+Run frontend unit tests locally:
+
+```bash
+cd frontend
+npm test
 ```
 
 Run E2E checks locally (starts a temporary API server automatically):
@@ -68,7 +83,7 @@ Run E2E checks inside Docker:
 make e2e-docker
 ```
 
-Run frontend scaffold unit test in Docker:
+Run frontend unit tests in Docker:
 
 ```bash
 make test-frontend-docker

@@ -8,9 +8,13 @@ This document describes reproducible setup and test execution for the current sc
    - `make install`
 2. Run backend unit tests:
    - `make test`
-3. Run the API server:
+3. Run the frontend console:
+   - `cd frontend && npm run dev`
+4. Run frontend unit tests:
+   - `cd frontend && npm test`
+5. Run the API server:
    - `make run`
-4. Run end-to-end API checks (starts temporary API server automatically):
+6. Run end-to-end API checks (starts temporary API server automatically):
    - `make e2e`
 5. Optional: enable OTLP trace export to a local Tempo instance:
    - `OPEN_MESSENGER_TRACING_ENABLED=true OPEN_MESSENGER_OTLP_TRACES_ENDPOINT=http://localhost:4318/v1/traces make run`
@@ -37,7 +41,7 @@ Optional: tighten or disable rate limiting during local runs:
    - `make test-docker`
 3. Run backend end-to-end API checks in a container:
    - `make e2e-docker`
-4. Run frontend scaffold unit test in a container:
+4. Run frontend unit tests in a container:
    - `make test-frontend-docker`
 5. Stop the stack:
    - `make down`

@@ -56,7 +56,7 @@ e2e-docker:
 	docker compose --profile test run --rm --build e2e
 
 test-frontend-docker:
-	docker run --rm -v "$$PWD":/workspace -w /workspace node:22-alpine node --test frontend/src/index.test.js
+	docker run --rm -v "$$PWD":/workspace -w /workspace/frontend node:22-alpine npm test
 
 up:
 	docker compose up --build -d api redis mysql prometheus loki promtail tempo grafana
