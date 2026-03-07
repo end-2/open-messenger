@@ -553,6 +553,12 @@ function renderBasePage(title: string, bodyClass: string, content: string): stri
       }
       @media (max-width: 980px) {
         .row, .metrics, .home-grid, .chat-layout, .hero { grid-template-columns: 1fr; }
+        .home-grid {
+          grid-template-areas:
+            "summary"
+            "workspace"
+            "user";
+        }
         .chat-layout {
           grid-auto-rows: minmax(18rem, 1fr);
         }
