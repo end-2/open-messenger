@@ -152,6 +152,44 @@ function renderBasePage(title: string, bodyClass: string, content: string): stri
         padding: 14px;
       }
       .feed time, .hint { color: var(--muted); font-size: 0.85rem; }
+      .message-actions {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+        margin-top: 12px;
+      }
+      .thread-shell {
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr) auto;
+        gap: 14px;
+        min-height: 0;
+      }
+      .thread-root,
+      .thread-reply {
+        border-radius: 18px;
+        padding: 14px;
+        background: rgba(255,255,255,0.58);
+      }
+      .thread-root {
+        border: 1px solid rgba(208, 87, 47, 0.24);
+      }
+      .thread-feed {
+        display: grid;
+        gap: 10px;
+        align-content: start;
+      }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        min-height: 28px;
+        padding: 0 10px;
+        border-radius: 999px;
+        background: var(--accent-soft);
+        color: var(--accent-strong);
+        font-size: 0.8rem;
+        font-weight: 700;
+      }
       .button-link {
         display: inline-flex;
         align-items: center;
@@ -475,9 +513,8 @@ export function renderChatPage(): string {
               <p class="mono hint break-anywhere" id="active-channel-id">No channel selected.</p>
             </div>
             <div style="min-width: 220px;">
-              <label>Sender user ID
-                <input name="senderUserId" id="sender-user-id-input" placeholder="usr_..." />
-              </label>
+              <div class="hint">Authenticated sender</div>
+              <div class="mono break-anywhere" id="session-user-id">Unknown user</div>
             </div>
           </header>
           <div class="scroll-region" id="message-list" style="display:grid; gap:12px; align-content:start;"></div>
@@ -498,16 +535,44 @@ export function renderChatPage(): string {
           </form>
         </section>
         <aside class="panel stream-panel">
-          <div>
-            <h2>Live Event Stream</h2>
-            <p class="hint">The browser connects through the frontend SSE proxy.</p>
-          </div>
-          <div class="row">
-            <button type="button" id="start-stream">Start stream</button>
-            <button type="button" class="ghost" id="stop-stream">Stop stream</button>
-          </div>
-          <div class="status" id="stream-status"></div>
-          <ul class="feed scroll-region" id="event-feed"></ul>
+          <section class="thread-shell" style="flex:1;">
+            <div>
+              <h2>Thread</h2>
+              <p class="hint">Open a message thread to inspect replies and continue the conversation.</p>
+            </div>
+            <div class="scroll-region" id="thread-panel">
+              <article class="thread-root">
+                <strong>No thread selected.</strong>
+                <p class="hint" style="margin:8px 0 0;">Use the transcript actions to start or open a thread.</p>
+              </article>
+            </div>
+            <form class="stack" id="thread-form" style="border-top:1px solid var(--border); padding-top:14px;">
+              <label>Thread reply
+                <textarea name="text" placeholder="Reply in the active thread" style="min-height:92px;"></textarea>
+              </label>
+              <div class="row">
+                <label>Idempotency key
+                  <input name="idempotencyKey" placeholder="optional-thread-request-key" />
+                </label>
+                <div style="display:grid; align-content:end;">
+                  <button type="submit">Send reply</button>
+                </div>
+              </div>
+              <div class="status" id="thread-status"></div>
+            </form>
+          </section>
+          <section class="stack" style="min-height: 18rem; flex:1;">
+            <div>
+              <h2>Live Event Stream</h2>
+              <p class="hint">The browser connects through the frontend SSE proxy.</p>
+            </div>
+            <div class="row">
+              <button type="button" id="start-stream">Start stream</button>
+              <button type="button" class="ghost" id="stop-stream">Stop stream</button>
+            </div>
+            <div class="status" id="stream-status"></div>
+            <ul class="feed scroll-region" id="event-feed"></ul>
+          </section>
         </aside>
       </section>
     </main>
@@ -522,10 +587,13 @@ export function renderChatPage(): string {
       const activeChannelName = document.querySelector("#active-channel-name");
       const activeChannelId = document.querySelector("#active-channel-id");
       const channelIdInput = document.querySelector("#channel-id-input");
-      const senderUserIdInput = document.querySelector("#sender-user-id-input");
+      const sessionUserId = document.querySelector("#session-user-id");
       const messageForm = document.querySelector("#message-form");
       const messageStatus = document.querySelector("#message-status");
       const messageList = document.querySelector("#message-list");
+      const threadPanel = document.querySelector("#thread-panel");
+      const threadForm = document.querySelector("#thread-form");
+      const threadStatus = document.querySelector("#thread-status");
       const refreshMessagesButton = document.querySelector("#refresh-messages");
       const startStreamButton = document.querySelector("#start-stream");
       const stopStreamButton = document.querySelector("#stop-stream");
@@ -533,6 +601,7 @@ export function renderChatPage(): string {
       const eventFeed = document.querySelector("#event-feed");
 
       let activeChannel = null;
+      let activeThread = null;
       let eventSource = null;
 
       function setStatus(element, message, isSuccess = false) {
@@ -550,6 +619,15 @@ export function renderChatPage(): string {
         } catch {
           return value;
         }
+      }
+
+      function escapeClientHtml(value) {
+        return String(value)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll("\"", "&quot;")
+          .replaceAll("'", "&#39;");
       }
 
       function readStoredIdentity() {
@@ -614,10 +692,12 @@ export function renderChatPage(): string {
 
       function setActiveChannel(channel) {
         activeChannel = channel;
+        activeThread = null;
         channelIdInput.value = channel.channel_id;
         activeChannelName.textContent = "# " + channel.name;
         activeChannelId.textContent = channel.channel_id;
         renderChannelList();
+        renderThreadPanel();
       }
 
       function renderMessages(items) {
@@ -633,18 +713,136 @@ export function renderChatPage(): string {
           bubble.className = "panel";
           bubble.style.padding = "16px";
           bubble.style.background = "var(--panel-strong)";
+          const threadButtonLabel = item.thread_id ? "Open thread" : "Start thread";
           bubble.innerHTML = [
             "<div style=\\"display:flex; justify-content:space-between; gap:12px; align-items:center;\\">",
-            "<strong>" + (item.sender_user_id || "unknown sender") + "</strong>",
+            "<strong>" + escapeClientHtml(item.sender_user_id || "unknown sender") + "</strong>",
             "<time class=\\"hint\\">" + formatTimestamp(item.created_at) + "</time>",
             "</div>",
-            "<p class=\\"preformatted\\" style=\\"color:var(--text); margin:12px 0 10px;\\">" + item.text.replaceAll("<", "&lt;").replaceAll(">", "&gt;") + "</p>",
-            "<div class=\\"mono hint break-anywhere\\">" + item.message_id + "</div>"
+            "<p class=\\"preformatted\\" style=\\"color:var(--text); margin:12px 0 10px;\\">" + escapeClientHtml(item.text) + "</p>",
+            "<div class=\\"mono hint break-anywhere\\">" + escapeClientHtml(item.message_id) + "</div>",
+            "<div class=\\"message-actions\\">",
+            "<span class=\\"pill\\">" + (item.thread_id ? "thread reply" : "channel message") + "</span>",
+            "<button type=\\"button\\" class=\\"ghost\\" data-message-id=\\"" + escapeClientHtml(item.message_id) + "\\" data-thread-id=\\"" + escapeClientHtml(item.thread_id || "") + "\\">" + threadButtonLabel + "</button>",
+            "</div>"
           ].join("");
+          const threadButton = bubble.querySelector("button[data-message-id]");
+          threadButton?.addEventListener("click", async () => {
+            try {
+              await openThreadForMessage(item);
+            } catch (error) {
+              setStatus(threadStatus, error instanceof Error ? error.message : "Unknown error");
+            }
+          });
           messageList.appendChild(bubble);
         }
 
         messageList.scrollTop = messageList.scrollHeight;
+      }
+
+      function renderThreadPanel(context = activeThread) {
+        if (!context) {
+          threadPanel.innerHTML = [
+            "<article class=\\"thread-root\\">",
+            "<strong>No thread selected.</strong>",
+            "<p class=\\"hint\\" style=\\"margin:8px 0 0;\\">Use the transcript actions to start or open a thread.</p>",
+            "</article>"
+          ].join("");
+          return;
+        }
+
+        const rootMessage = context.root_message;
+        const replies = context.replies || [];
+        const sections = [
+          "<article class=\\"thread-root\\">",
+          "<div style=\\"display:flex; justify-content:space-between; gap:12px; align-items:center;\\">",
+          "<strong>" + escapeClientHtml(rootMessage.sender_user_id || "unknown sender") + "</strong>",
+          "<span class=\\"pill\\">root</span>",
+          "</div>",
+          "<p class=\\"preformatted\\" style=\\"color:var(--text); margin:12px 0 10px;\\">" + escapeClientHtml(rootMessage.text) + "</p>",
+          "<div class=\\"mono hint break-anywhere\\">" + escapeClientHtml(context.thread.thread_id) + "</div>",
+          "<div class=\\"hint\\" style=\\"margin-top:8px;\\">" + String(context.thread.reply_count) + " replies, last activity " + formatTimestamp(context.thread.last_message_at) + "</div>",
+          "</article>"
+        ];
+
+        if (!replies.length) {
+          sections.push("<article class=\\"thread-reply\\"><strong>No replies yet.</strong><p class=\\"hint\\" style=\\"margin:8px 0 0;\\">Send the first reply in this thread.</p></article>");
+        } else {
+          sections.push("<div class=\\"thread-feed\\">");
+          for (const reply of replies) {
+            sections.push([
+              "<article class=\\"thread-reply\\">",
+              "<div style=\\"display:flex; justify-content:space-between; gap:12px; align-items:center;\\">",
+              "<strong>" + escapeClientHtml(reply.sender_user_id || "unknown sender") + "</strong>",
+              "<time class=\\"hint\\">" + formatTimestamp(reply.created_at) + "</time>",
+              "</div>",
+              "<p class=\\"preformatted\\" style=\\"color:var(--text); margin:12px 0 10px;\\">" + escapeClientHtml(reply.text) + "</p>",
+              "<div class=\\"mono hint break-anywhere\\">" + escapeClientHtml(reply.message_id) + "</div>",
+              "</article>"
+            ].join(""));
+          }
+          sections.push("</div>");
+        }
+
+        if (context.has_more_replies) {
+          sections.push("<p class=\\"hint\\" style=\\"margin:0;\\">Additional replies exist beyond the current thread view limit.</p>");
+        }
+
+        threadPanel.innerHTML = sections.join("");
+      }
+
+      async function loadThreadContext(threadId) {
+        const accessToken = getAccessToken();
+        if (!accessToken) {
+          setStatus(sessionStatus, "An access token is required.");
+          return;
+        }
+
+        setStatus(threadStatus, "Loading thread...");
+
+        const response = await fetch("/api/threads/context", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ accessToken, threadId })
+        });
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(formatJson(payload));
+        }
+
+        activeThread = payload;
+        renderThreadPanel(payload);
+        setStatus(threadStatus, "Thread loaded.", true);
+      }
+
+      async function openThreadForMessage(message) {
+        const accessToken = getAccessToken();
+        if (!accessToken) {
+          setStatus(sessionStatus, "An access token is required.");
+          return;
+        }
+
+        if (message.thread_id) {
+          await loadThreadContext(message.thread_id);
+          return;
+        }
+
+        setStatus(threadStatus, "Opening thread...");
+        const response = await fetch("/api/threads", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            accessToken,
+            channelId: activeChannel?.channel_id || "",
+            rootMessageId: message.message_id
+          })
+        });
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(formatJson(payload));
+        }
+
+        await loadThreadContext(payload.thread_id);
       }
 
       async function loadMessages() {
@@ -689,7 +887,7 @@ export function renderChatPage(): string {
         const storedToken = typeof storedIdentity?.token?.token === "string" ? storedIdentity.token.token : "";
         const storedUserId = typeof storedIdentity?.user?.user_id === "string" ? storedIdentity.user.user_id : "";
         accessTokenInput.value = tokenFromUrl || storedToken;
-        senderUserIdInput.value = storedUserId;
+        sessionUserId.textContent = storedUserId || "Unknown user";
 
         if (accessTokenInput.value) {
           setStatus(sessionStatus, "Session restored from saved identity.", true);
@@ -717,6 +915,7 @@ export function renderChatPage(): string {
 
       clearSessionButton.addEventListener("click", () => {
         accessTokenInput.value = "";
+        sessionUserId.textContent = "Unknown user";
         localStorage.removeItem("openMessenger.identity");
         setStatus(sessionStatus, "Saved token cleared.", true);
       });
@@ -761,7 +960,6 @@ export function renderChatPage(): string {
         const form = new FormData(messageForm);
         const channelId = String(form.get("channelId") || "").trim();
         const text = String(form.get("text") || "").trim();
-        const senderUserId = String(form.get("senderUserId") || "").trim();
         const idempotencyKey = String(form.get("idempotencyKey") || "").trim();
 
         if (!accessToken) {
@@ -783,7 +981,6 @@ export function renderChatPage(): string {
               accessToken,
               channelId,
               text,
-              senderUserId,
               idempotencyKey
             })
           });
@@ -794,11 +991,55 @@ export function renderChatPage(): string {
 
           messageForm.reset();
           channelIdInput.value = channelId;
-          senderUserIdInput.value = senderUserId;
           setStatus(messageStatus, "Message sent.", true);
           await loadMessages();
         } catch (error) {
           setStatus(messageStatus, error instanceof Error ? error.message : "Unknown error");
+        }
+      });
+
+      threadForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const accessToken = getAccessToken();
+        const form = new FormData(threadForm);
+        const text = String(form.get("text") || "").trim();
+        const idempotencyKey = String(form.get("idempotencyKey") || "").trim();
+
+        if (!accessToken) {
+          setStatus(sessionStatus, "An access token is required.");
+          return;
+        }
+        if (!activeThread?.thread?.thread_id) {
+          setStatus(threadStatus, "Open a thread before replying.");
+          return;
+        }
+
+        setStatus(threadStatus, "Sending thread reply...");
+
+        try {
+          const response = await fetch("/api/threads/messages", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              accessToken,
+              threadId: activeThread.thread.thread_id,
+              text,
+              idempotencyKey
+            })
+          });
+          const payload = await response.json();
+          if (!response.ok) {
+            throw new Error(formatJson(payload));
+          }
+
+          threadForm.reset();
+          setStatus(threadStatus, "Thread reply sent.", true);
+          await Promise.all([
+            loadThreadContext(activeThread.thread.thread_id),
+            loadMessages()
+          ]);
+        } catch (error) {
+          setStatus(threadStatus, error instanceof Error ? error.message : "Unknown error");
         }
       });
 
@@ -842,6 +1083,7 @@ export function renderChatPage(): string {
 
       restoreSession();
       renderChannelList();
+      renderThreadPanel();
       const channels = readStoredChannels();
       if (channels.length > 0) {
         setActiveChannel(channels[0]);

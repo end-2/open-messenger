@@ -59,6 +59,23 @@ def _to_websocket_url(base_url: str, path: str) -> str:
     raise ValueError(f"Unsupported base URL: {base_url}")
 
 
+def _recv_event_by_type(
+    websocket,
+    expected_type: str,
+    *,
+    attempts: int = 5,
+    message_id: str | None = None,
+) -> dict[str, Any]:
+    for _ in range(attempts):
+        payload = json.loads(websocket.recv())
+        if payload.get("type") != expected_type:
+            continue
+        if message_id is not None and payload.get("data", {}).get("message_id") != message_id:
+            continue
+        return payload
+    raise AssertionError(f"Did not receive expected WebSocket event type: {expected_type}")
+
+
 def run(base_url: str, admin_token: str) -> None:
     default_scopes = [
         "channels:read",
@@ -120,6 +137,10 @@ def run(base_url: str, admin_token: str) -> None:
             headers=native_headers,
             json=message_payload,
         ).json()
+        _expect(
+            first_message["sender_user_id"] == user_id,
+            "Native channel message sender did not match authenticated user",
+        )
         second_message = _request(
             client,
             "POST",
@@ -156,6 +177,10 @@ def run(base_url: str, admin_token: str) -> None:
             headers=native_headers,
             json=reply_payload,
         ).json()
+        _expect(
+            first_reply["sender_user_id"] == user_id,
+            "Native thread reply sender did not match authenticated user",
+        )
         second_reply = _request(
             client,
             "POST",
@@ -178,13 +203,22 @@ def run(base_url: str, admin_token: str) -> None:
             pong_payload = json.loads(websocket.recv())
             _expect(pong_payload == {"type": "pong"}, "WebSocket ping/pong failed")
 
+            ws_root_response = _request(
+                client,
+                "POST",
+                f"/v1/channels/{channel_id}/messages",
+                201,
+                headers=native_headers,
+                json={"text": "websocket root"},
+            ).json()
+
             thread_ws_response = _request(
                 client,
                 "POST",
                 f"/v1/channels/{channel_id}/threads",
                 201,
                 headers=native_headers,
-                json={"root_message_id": first_message["message_id"]},
+                json={"root_message_id": ws_root_response["message_id"]},
             ).json()
             ws_thread_id = thread_ws_response["thread_id"]
 
@@ -196,9 +230,17 @@ def run(base_url: str, admin_token: str) -> None:
                 headers=native_headers,
                 json={"text": "websocket reply", "sender_user_id": "e2e-sender"},
             ).json()
+            _expect(
+                ws_reply_response["sender_user_id"] == user_id,
+                "WebSocket-triggered thread reply sender did not match authenticated user",
+            )
 
-            ws_thread_event = json.loads(websocket.recv())
-            ws_message_event = json.loads(websocket.recv())
+            ws_thread_event = _recv_event_by_type(websocket, "thread.created")
+            ws_message_event = _recv_event_by_type(
+                websocket,
+                "message.created",
+                message_id=ws_reply_response["message_id"],
+            )
 
         _expect(ws_thread_event["type"] == "thread.created", "WebSocket thread event missing")
         _expect(ws_thread_event["data"]["thread_id"] == ws_thread_id, "WebSocket thread event mismatch")

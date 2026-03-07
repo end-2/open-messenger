@@ -6,7 +6,7 @@ This frontend is a lightweight TypeScript BFF and browser console for the docume
 
 - Inspect `/v1/info` service metadata
 - Bootstrap a user and plaintext token through `/admin/v1/users` and `/admin/v1/tokens`
-- Open a dedicated chat page for channel creation, room history, message posting, and event streaming
+- Open a dedicated chat page for channel creation, room history, message posting, thread replies, and event streaming
 - Load channel messages
 - Subscribe to the backend SSE event stream through the frontend proxy
 
@@ -26,7 +26,7 @@ Environment variables:
 Open `http://127.0.0.1:3001` after the backend API is available.
 
 - `/`: service snapshot and user/token bootstrap
-- `/chat`: channel and message console with a room-style layout
+- `/chat`: channel and message console with a room-style layout, authenticated sender display, and a dedicated thread panel
 
 ## Docker
 

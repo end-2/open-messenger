@@ -28,9 +28,8 @@ class ThreadResponse(BaseModel):
     created_at: str
 
 
-class CreateMessageRequest(BaseModel):
+class MessageWriteFields(BaseModel):
     text: str = Field(min_length=1)
-    sender_user_id: str = "system"
     thread_id: Optional[str] = None
     attachments: list[str] = Field(default_factory=list)
     idempotency_key: Optional[str] = None
@@ -38,6 +37,14 @@ class CreateMessageRequest(BaseModel):
     blocks: list[dict[str, Any]] = Field(default_factory=list)
     mentions: list[str] = Field(default_factory=list)
     raw_payload: dict[str, Any] = Field(default_factory=dict)
+
+
+class NativeCreateMessageRequest(MessageWriteFields):
+    pass
+
+
+class CreateMessageRequest(MessageWriteFields):
+    sender_user_id: str = "system"
 
 
 class MessageResponse(BaseModel):
@@ -70,7 +77,7 @@ class BatchGetMessagesResponse(BaseModel):
     not_found_ids: list[str]
 
 
-class BatchCreateMessageItem(CreateMessageRequest):
+class BatchCreateMessageItem(MessageWriteFields):
     channel_id: str = Field(min_length=1)
 
 

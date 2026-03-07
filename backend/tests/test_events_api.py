@@ -31,7 +31,9 @@ def _admin_headers() -> dict[str, str]:
     return {"X-Admin-Token": "dev-admin-token"}
 
 
-def _issue_bearer_headers(client: httpx.Client, scopes: list[str] | None = None) -> dict[str, str]:
+def _issue_bearer_headers(
+    client: httpx.Client, scopes: list[str] | None = None
+) -> tuple[dict[str, str], str]:
     granted_scopes = scopes if scopes is not None else DEFAULT_NATIVE_SCOPES
 
     user_response = client.post(
@@ -49,7 +51,7 @@ def _issue_bearer_headers(client: httpx.Client, scopes: list[str] | None = None)
     )
     assert token_response.status_code == 201
     token = token_response.json()["token"]
-    return {"Authorization": f"Bearer {token}"}
+    return {"Authorization": f"Bearer {token}"}, user_id
 
 
 def _create_channel(client: httpx.Client, headers: dict[str, str], name: str = "events") -> str:
@@ -116,7 +118,7 @@ def test_event_stream_emits_thread_and_message_events() -> None:
             httpx.Client(base_url=base_url, timeout=5) as control_client,
             httpx.Client(base_url=base_url, timeout=5) as stream_client,
         ):
-            headers = _issue_bearer_headers(control_client)
+            headers, user_id = _issue_bearer_headers(control_client)
             channel_id = _create_channel(control_client, headers)
 
             root_response = control_client.post(
@@ -167,7 +169,7 @@ def test_event_stream_emits_thread_and_message_events() -> None:
         "channel_id": channel_id,
         "thread_id": thread_id,
         "message_id": message_id,
-        "sender_user_id": "system",
+        "sender_user_id": user_id,
         "compat_origin": "native",
         "attachments": [],
     }
@@ -179,7 +181,7 @@ def test_event_stream_emits_file_uploaded_event() -> None:
             httpx.Client(base_url=base_url, timeout=5) as control_client,
             httpx.Client(base_url=base_url, timeout=5) as stream_client,
         ):
-            headers = _issue_bearer_headers(control_client)
+            headers, _ = _issue_bearer_headers(control_client)
 
             with stream_client.stream("GET", "/v1/events/stream", headers=headers) as stream_response:
                 lines = stream_response.iter_lines()
@@ -208,7 +210,7 @@ def test_event_stream_emits_file_uploaded_event() -> None:
 
 def test_websocket_event_gateway_emits_standard_events() -> None:
     client = TestClient(create_app())
-    headers = _issue_bearer_headers(client)
+    headers, user_id = _issue_bearer_headers(client)
     channel_id = _create_channel(client, headers)
 
     root_response = client.post(
@@ -254,7 +256,7 @@ def test_websocket_event_gateway_emits_standard_events() -> None:
         "channel_id": channel_id,
         "thread_id": thread_id,
         "message_id": message_id,
-        "sender_user_id": "system",
+        "sender_user_id": user_id,
         "compat_origin": "native",
         "attachments": [],
     }
@@ -267,7 +269,7 @@ def test_websocket_event_gateway_requires_token_and_scope() -> None:
         with client.websocket_connect("/v1/events/ws"):
             pass
 
-    headers = _issue_bearer_headers(client, scopes=["channels:read"])
+    headers, _ = _issue_bearer_headers(client, scopes=["channels:read"])
     with pytest.raises(WebSocketDisconnect):
         with client.websocket_connect("/v1/events/ws", headers=headers):
             pass
@@ -275,7 +277,7 @@ def test_websocket_event_gateway_requires_token_and_scope() -> None:
 
 def test_websocket_event_gateway_accepts_query_token() -> None:
     client = TestClient(create_app())
-    headers = _issue_bearer_headers(client)
+    headers, _ = _issue_bearer_headers(client)
     raw_token = headers["Authorization"].split(" ", 1)[1]
 
     with client.websocket_connect(f"/v1/events/ws?access_token={raw_token}") as websocket:

@@ -26,8 +26,12 @@ test("renderChatPage includes dedicated chat workflow sections", () => {
   assert.match(html, /Create Channel/);
   assert.match(html, /Live Event Stream/);
   assert.match(html, /Active Room/);
+  assert.match(html, /Authenticated sender/);
+  assert.match(html, /Open a message thread/);
+  assert.match(html, /id="thread-panel"/);
   assert.match(html, /class="chat-layout viewport-panel"/);
   assert.match(html, /class="scroll-region" id="message-list"/);
   assert.match(html, /class="feed scroll-region" id="event-feed"/);
   assert.match(html, /class="break-anywhere" name="accessToken"/);
+  assert.doesNotMatch(html, /Sender user ID/);
 });

@@ -1,6 +1,6 @@
 # Open Messenger
 
-Open Messenger is a monorepo for a multi-channel messaging platform with a FastAPI backend and a Node.js TypeScript frontend console.
+Open Messenger is a monorepo for a multi-channel messaging platform with a FastAPI backend and a Node.js TypeScript frontend console. The chat console supports channel messaging, root-level thread creation, threaded replies, and live event inspection.
 
 ## Quick Start
 
@@ -61,6 +61,8 @@ The examples below use only the required request fields and cover a minimal flow
 6. Create a thread from the root message.
 7. Send a reply in the thread.
 8. Fetch the thread context.
+
+For native message endpoints, `sender_user_id` is derived from the authenticated bearer token user. Clients should not attempt to set the sender explicitly.
 
 Assumptions:
 

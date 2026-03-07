@@ -33,6 +33,15 @@ export type FrontendChannel = {
   created_at: string;
 };
 
+export type FrontendThread = {
+  thread_id: string;
+  channel_id: string;
+  root_message_id: string;
+  reply_count: number;
+  last_message_at: string;
+  created_at: string;
+};
+
 export type FrontendMessage = {
   message_id: string;
   channel_id: string;
@@ -47,6 +56,13 @@ export type FrontendMessage = {
   compat_origin: string;
   idempotency_key: string | null;
   metadata: Record<string, unknown>;
+};
+
+export type FrontendThreadContext = {
+  thread: FrontendThread;
+  root_message: FrontendMessage;
+  replies: FrontendMessage[];
+  has_more_replies: boolean;
 };
 
 type FetchLike = typeof fetch;
@@ -136,11 +152,36 @@ export class BackendClient {
 
   async createMessage(accessToken: string, channelId: string, payload: {
     text: string;
-    sender_user_id?: string;
     thread_id?: string;
     idempotency_key?: string;
   }): Promise<FrontendMessage> {
     return this.request<FrontendMessage>(`/v1/channels/${channelId}/messages`, {
+      method: "POST",
+      accessToken,
+      body: payload
+    });
+  }
+
+  async createThread(accessToken: string, channelId: string, rootMessageId: string): Promise<FrontendThread> {
+    return this.request<FrontendThread>(`/v1/channels/${channelId}/threads`, {
+      method: "POST",
+      accessToken,
+      body: { root_message_id: rootMessageId }
+    });
+  }
+
+  async getThreadContext(accessToken: string, threadId: string): Promise<FrontendThreadContext> {
+    return this.request<FrontendThreadContext>(`/v1/threads/${threadId}/context`, {
+      method: "GET",
+      accessToken
+    });
+  }
+
+  async createThreadMessage(accessToken: string, threadId: string, payload: {
+    text: string;
+    idempotency_key?: string;
+  }): Promise<FrontendMessage> {
+    return this.request<FrontendMessage>(`/v1/threads/${threadId}/messages`, {
       method: "POST",
       accessToken,
       body: payload

@@ -138,6 +138,8 @@ Token properties:
 
 Base path: `/v1`
 
+For authenticated native message writes, the service derives `sender_user_id` from the bearer token subject rather than trusting a client-supplied sender field.
+
 Representative endpoints:
 
 - `POST /channels`

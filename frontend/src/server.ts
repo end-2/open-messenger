@@ -89,9 +89,43 @@ export function createFrontendServer(client: BackendClient, pages: { home: strin
         const body = await readJson(request);
         const message = await client.createMessage(String(body.accessToken ?? ""), String(body.channelId ?? ""), {
           text: String(body.text ?? ""),
-          sender_user_id: String(body.senderUserId ?? "") || undefined,
           idempotency_key: String(body.idempotencyKey ?? "") || undefined
         });
+        sendJson(response, 201, message);
+        return;
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/threads") {
+        const body = await readJson(request);
+        const thread = await client.createThread(
+          String(body.accessToken ?? ""),
+          String(body.channelId ?? ""),
+          String(body.rootMessageId ?? "")
+        );
+        sendJson(response, 201, thread);
+        return;
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/threads/context") {
+        const body = await readJson(request);
+        const context = await client.getThreadContext(
+          String(body.accessToken ?? ""),
+          String(body.threadId ?? "")
+        );
+        sendJson(response, 200, context);
+        return;
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/threads/messages") {
+        const body = await readJson(request);
+        const message = await client.createThreadMessage(
+          String(body.accessToken ?? ""),
+          String(body.threadId ?? ""),
+          {
+            text: String(body.text ?? ""),
+            idempotency_key: String(body.idempotencyKey ?? "") || undefined
+          }
+        );
         sendJson(response, 201, message);
         return;
       }

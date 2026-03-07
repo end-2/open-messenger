@@ -45,6 +45,30 @@ def _issue_bearer_headers(client: TestClient, scopes: list[str] | None = None) -
     return {"Authorization": f"Bearer {token}"}
 
 
+def _issue_bearer_identity(
+    client: TestClient, scopes: list[str] | None = None
+) -> tuple[dict[str, str], str]:
+    granted_scopes = scopes if scopes is not None else DEFAULT_NATIVE_SCOPES
+
+    user_response = client.post(
+        "/admin/v1/users",
+        json={"username": "native-identity", "display_name": "Native Identity"},
+        headers=_admin_headers(),
+    )
+    assert user_response.status_code == 201
+    user_id = user_response.json()["user_id"]
+
+    token_response = client.post(
+        "/admin/v1/tokens",
+        json={"user_id": user_id, "token_type": "user_token", "scopes": granted_scopes},
+        headers=_admin_headers(),
+    )
+    assert token_response.status_code == 201
+    token = token_response.json()["token"]
+
+    return {"Authorization": f"Bearer {token}"}, user_id
+
+
 def _create_channel(client: TestClient, headers: dict[str, str], name: str = "general") -> str:
     response = client.post("/v1/channels", json={"name": name}, headers=headers)
     assert response.status_code == 201
@@ -132,6 +156,21 @@ def test_post_and_list_channel_messages_with_cursor() -> None:
     page2_payload = page2.json()
     assert [item["text"] for item in page2_payload["items"]] == ["message-3"]
     assert page2_payload["next_cursor"] is None
+
+
+def test_native_message_sender_uses_authenticated_user() -> None:
+    client = TestClient(create_app())
+    headers, user_id = _issue_bearer_identity(client)
+    channel_id = _create_channel(client, headers)
+
+    response = client.post(
+        f"/v1/channels/{channel_id}/messages",
+        json={"text": "sender check", "sender_user_id": "spoofed-user"},
+        headers=headers,
+    )
+
+    assert response.status_code == 201
+    assert response.json()["sender_user_id"] == user_id
 
 
 def test_create_message_with_uploaded_attachment() -> None:
@@ -399,6 +438,65 @@ def test_create_thread_and_post_thread_message() -> None:
     items = channel_messages_response.json()["items"]
     assert [item["text"] for item in items] == ["root", "reply"]
     assert items[1]["thread_id"] == thread_payload["thread_id"]
+
+
+def test_create_thread_reuses_existing_root_thread() -> None:
+    client = TestClient(create_app())
+    headers = _issue_bearer_headers(client)
+    channel_id = _create_channel(client, headers)
+
+    root_response = client.post(
+        f"/v1/channels/{channel_id}/messages",
+        json={"text": "root"},
+        headers=headers,
+    )
+    assert root_response.status_code == 201
+    root_message_id = root_response.json()["message_id"]
+
+    first = client.post(
+        f"/v1/channels/{channel_id}/threads",
+        json={"root_message_id": root_message_id},
+        headers=headers,
+    )
+    second = client.post(
+        f"/v1/channels/{channel_id}/threads",
+        json={"root_message_id": root_message_id},
+        headers=headers,
+    )
+
+    assert first.status_code == 201
+    assert second.status_code == 200
+    assert second.json()["thread_id"] == first.json()["thread_id"]
+    assert second.json()["root_message_id"] == root_message_id
+
+
+def test_native_thread_reply_sender_uses_authenticated_user() -> None:
+    client = TestClient(create_app())
+    headers, user_id = _issue_bearer_identity(client)
+    channel_id = _create_channel(client, headers)
+
+    root_response = client.post(
+        f"/v1/channels/{channel_id}/messages",
+        json={"text": "root"},
+        headers=headers,
+    )
+    assert root_response.status_code == 201
+
+    thread_response = client.post(
+        f"/v1/channels/{channel_id}/threads",
+        json={"root_message_id": root_response.json()["message_id"]},
+        headers=headers,
+    )
+    assert thread_response.status_code == 201
+
+    reply_response = client.post(
+        f"/v1/threads/{thread_response.json()['thread_id']}/messages",
+        json={"text": "reply", "sender_user_id": "spoofed-user"},
+        headers=headers,
+    )
+
+    assert reply_response.status_code == 201
+    assert reply_response.json()["sender_user_id"] == user_id
 
 
 def test_thread_endpoints_validate_target_entities() -> None:

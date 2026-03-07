@@ -41,6 +41,7 @@ from .schemas import (
     FileObjectResponse,
     ListMessagesResponse,
     MessageResponse,
+    NativeCreateMessageRequest,
     ThreadContextResponse,
     ThreadResponse,
 )
@@ -238,10 +239,10 @@ async def get_channel(
 )
 async def create_channel_message(
     channel_id: str,
-    payload: CreateMessageRequest,
+    payload: NativeCreateMessageRequest,
     request: Request,
     response: Response,
-    _: AuthContext = Depends(require_scopes(["messages:write"])),
+    context: AuthContext = Depends(require_scopes(["messages:write"])),
 ) -> dict[str, Any]:
     metadata_store = request.app.state.metadata_store
     content_store = request.app.state.content_store
@@ -265,14 +266,19 @@ async def create_channel_message(
                 retryable=False,
             )
 
+    internal_payload = CreateMessageRequest(
+        **payload.model_dump(),
+        sender_user_id=context.user_id,
+    )
+
     message_response, occurred_at, created = await store_message(
         channel_id=channel_id,
-        payload=payload,
+        payload=internal_payload,
         metadata_store=metadata_store,
         content_store=content_store,
     )
-    if payload.thread_id is not None and created:
-        await increment_thread_reply(metadata_store, payload.thread_id, occurred_at)
+    if internal_payload.thread_id is not None and created:
+        await increment_thread_reply(metadata_store, internal_payload.thread_id, occurred_at)
     if created:
         await publish_event(
             request,
@@ -352,7 +358,7 @@ async def batch_get_messages(
 async def batch_create_messages(
     payload: BatchCreateMessagesRequest,
     request: Request,
-    _: AuthContext = Depends(require_scopes(["messages:write"])),
+    context: AuthContext = Depends(require_scopes(["messages:write"])),
 ) -> dict[str, Any]:
     metadata_store = request.app.state.metadata_store
     content_store = request.app.state.content_store
@@ -378,14 +384,19 @@ async def batch_create_messages(
                     retryable=False,
                 )
 
+        internal_payload = CreateMessageRequest(
+            **message.model_dump(exclude={"channel_id"}),
+            sender_user_id=context.user_id,
+        )
+
         message_response, occurred_at, created = await store_message(
             channel_id=message.channel_id,
-            payload=CreateMessageRequest(**message.model_dump(exclude={"channel_id"})),
+            payload=internal_payload,
             metadata_store=metadata_store,
             content_store=content_store,
         )
-        if message.thread_id is not None and created:
-            await increment_thread_reply(metadata_store, message.thread_id, occurred_at)
+        if internal_payload.thread_id is not None and created:
+            await increment_thread_reply(metadata_store, internal_payload.thread_id, occurred_at)
         if created:
             await publish_event(
                 request,
@@ -414,6 +425,7 @@ async def create_channel_thread(
     channel_id: str,
     payload: CreateThreadRequest,
     request: Request,
+    response: Response,
     _: AuthContext = Depends(require_scopes(["messages:write"])),
 ) -> dict[str, Any]:
     metadata_store = request.app.state.metadata_store
@@ -434,6 +446,11 @@ async def create_channel_thread(
             message="Root message does not belong to the channel",
             retryable=False,
         )
+
+    existing_thread = await metadata_store.get_thread_by_root_message(payload.root_message_id)
+    if existing_thread is not None:
+        response.status_code = status.HTTP_200_OK
+        return existing_thread
 
     now = utc_now_iso()
     thread = Thread(
@@ -512,10 +529,10 @@ async def get_thread_context(
 )
 async def create_thread_message(
     thread_id: str,
-    payload: CreateMessageRequest,
+    payload: NativeCreateMessageRequest,
     request: Request,
     response: Response,
-    _: AuthContext = Depends(require_scopes(["messages:write"])),
+    context: AuthContext = Depends(require_scopes(["messages:write"])),
 ) -> dict[str, Any]:
     metadata_store = request.app.state.metadata_store
     content_store = request.app.state.content_store
@@ -538,9 +555,13 @@ async def create_thread_message(
         )
 
     channel_id = str(thread["channel_id"])
+    internal_payload = CreateMessageRequest(
+        **payload.model_dump(),
+        sender_user_id=context.user_id,
+    )
     message_response, occurred_at, created = await store_message(
         channel_id=channel_id,
-        payload=payload,
+        payload=internal_payload,
         metadata_store=metadata_store,
         content_store=content_store,
         force_thread_id=thread_id,

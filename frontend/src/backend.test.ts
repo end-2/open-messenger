@@ -73,3 +73,93 @@ test("BackendClient surfaces structured backend failures", async () => {
       (error.details as { code?: string }).code === "channel_not_found"
   );
 });
+
+test("BackendClient supports thread workflows", async () => {
+  const calls: Array<{ url: string; body: string | undefined }> = [];
+  const fetchStub: typeof fetch = async (input, init) => {
+    calls.push({
+      url: String(input),
+      body: init?.body ? String(init.body) : undefined
+    });
+
+    if (String(input).endsWith("/v1/channels/ch_1/threads")) {
+      return new Response(
+        JSON.stringify({
+          thread_id: "th_1",
+          channel_id: "ch_1",
+          root_message_id: "msg_root",
+          reply_count: 0,
+          last_message_at: "2026-03-07T00:00:00Z",
+          created_at: "2026-03-07T00:00:00Z"
+        }),
+        { status: 201 }
+      );
+    }
+
+    if (String(input).endsWith("/v1/threads/th_1/context")) {
+      return new Response(
+        JSON.stringify({
+          thread: {
+            thread_id: "th_1",
+            channel_id: "ch_1",
+            root_message_id: "msg_root",
+            reply_count: 1,
+            last_message_at: "2026-03-07T00:00:05Z",
+            created_at: "2026-03-07T00:00:00Z"
+          },
+          root_message: {
+            message_id: "msg_root",
+            channel_id: "ch_1",
+            thread_id: null,
+            sender_user_id: "usr_1",
+            content_ref: "cnt_root",
+            text: "root",
+            attachments: [],
+            created_at: "2026-03-07T00:00:00Z",
+            updated_at: "2026-03-07T00:00:00Z",
+            deleted_at: null,
+            compat_origin: "native",
+            idempotency_key: null,
+            metadata: {}
+          },
+          replies: [],
+          has_more_replies: false
+        }),
+        { status: 200 }
+      );
+    }
+
+    return new Response(
+      JSON.stringify({
+        message_id: "msg_reply",
+        channel_id: "ch_1",
+        thread_id: "th_1",
+        sender_user_id: "usr_1",
+        content_ref: "cnt_reply",
+        text: "reply",
+        attachments: [],
+        created_at: "2026-03-07T00:00:05Z",
+        updated_at: "2026-03-07T00:00:05Z",
+        deleted_at: null,
+        compat_origin: "native",
+        idempotency_key: null,
+        metadata: {}
+      }),
+      { status: 201 }
+    );
+  };
+
+  const client = new BackendClient("http://api.example", "dev-admin-token", fetchStub);
+  const thread = await client.createThread("token", "ch_1", "msg_root");
+  const context = await client.getThreadContext("token", thread.thread_id);
+  const reply = await client.createThreadMessage("token", thread.thread_id, { text: "reply" });
+
+  assert.equal(thread.thread_id, "th_1");
+  assert.equal(context.thread.root_message_id, "msg_root");
+  assert.equal(reply.thread_id, "th_1");
+  assert.match(calls[0].url, /\/v1\/channels\/ch_1\/threads$/);
+  assert.match(calls[1].url, /\/v1\/threads\/th_1\/context$/);
+  assert.match(calls[2].url, /\/v1\/threads\/th_1\/messages$/);
+  assert.match(calls[0].body ?? "", /msg_root/);
+  assert.match(calls[2].body ?? "", /reply/);
+});

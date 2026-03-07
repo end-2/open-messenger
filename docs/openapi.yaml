@@ -148,7 +148,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateMessageRequest'
+              $ref: '#/components/schemas/NativeCreateMessageRequest'
       responses:
         '201':
           description: Successful Response
@@ -351,7 +351,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateMessageRequest'
+              $ref: '#/components/schemas/NativeCreateMessageRequest'
       responses:
         '201':
           description: Successful Response
@@ -699,10 +699,6 @@ components:
           type: string
           minLength: 1
           title: Text
-        sender_user_id:
-          type: string
-          title: Sender User Id
-          default: system
         thread_id:
           anyOf:
           - type: string
@@ -883,54 +879,6 @@ components:
       required:
       - name
       title: CreateChannelRequest
-    CreateMessageRequest:
-      properties:
-        text:
-          type: string
-          minLength: 1
-          title: Text
-        sender_user_id:
-          type: string
-          title: Sender User Id
-          default: system
-        thread_id:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Thread Id
-        attachments:
-          items:
-            type: string
-          type: array
-          title: Attachments
-        idempotency_key:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Idempotency Key
-        metadata:
-          additionalProperties: true
-          type: object
-          title: Metadata
-        blocks:
-          items:
-            additionalProperties: true
-            type: object
-          type: array
-          title: Blocks
-        mentions:
-          items:
-            type: string
-          type: array
-          title: Mentions
-        raw_payload:
-          additionalProperties: true
-          type: object
-          title: Raw Payload
-      type: object
-      required:
-      - text
-      title: CreateMessageRequest
     CreateThreadRequest:
       properties:
         root_message_id:
@@ -1143,6 +1091,50 @@ components:
       - idempotency_key
       - metadata
       title: MessageResponse
+    NativeCreateMessageRequest:
+      properties:
+        text:
+          type: string
+          minLength: 1
+          title: Text
+        thread_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Thread Id
+        attachments:
+          items:
+            type: string
+          type: array
+          title: Attachments
+        idempotency_key:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Idempotency Key
+        metadata:
+          additionalProperties: true
+          type: object
+          title: Metadata
+        blocks:
+          items:
+            additionalProperties: true
+            type: object
+          type: array
+          title: Blocks
+        mentions:
+          items:
+            type: string
+          type: array
+          title: Mentions
+        raw_payload:
+          additionalProperties: true
+          type: object
+          title: Raw Payload
+      type: object
+      required:
+      - text
+      title: NativeCreateMessageRequest
     SlackPostMessageRequest:
       properties:
         channel:
