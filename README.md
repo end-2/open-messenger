@@ -6,103 +6,32 @@ Open Messenger is a monorepo for a multi-channel messaging platform with a FastA
 
 Prerequisites:
 
-- Python 3.12+
-- Node.js 22+ (frontend console only)
 - Docker Engine with the Compose plugin
+- `curl`
+- `jq`
 
-Install the local Python environment:
-
-```bash
-make install
-```
-
-Run the API locally:
-
-```bash
-make run
-```
-
-Run local unit tests:
-
-```bash
-make test
-cd frontend && npm test
-make test-frontend-cli-golang-docker
-```
-
-Run end-to-end checks locally:
-
-```bash
-make e2e
-```
-
-Start the full application stack in Docker:
+Start the full application stack:
 
 ```bash
 make fullstack-up
 ```
 
-The default `docker compose` application stack runs the API with `redis` for message content and `mysql` for metadata.
-
-Run tests in Docker:
-
-```bash
-make test-docker
-make test-frontend-docker
-make test-frontend-cli-golang-docker
-make e2e-docker
-```
-
-Build and run the Go CLI:
-
-```bash
-make build-go-cli
-./frontend-cli-golang/build/open-messenger-cli-go
-```
-
-`make build-go-cli` detects the current host OS and CPU architecture and compiles a static binary via the `golang:1.22-alpine` Docker image. The binary is written to `frontend-cli-golang/build/open-messenger-cli-go`. No Go toolchain is required on the host.
-
-Inside the CLI, type `help` to see all available commands. A typical session:
-
-```
-om> bootstrap alice "Alice Smith"
-om> create-channel general
-om:general> send "Hello!"
-om:general> list
-om:general> exit
-```
-
-Available commands: `bootstrap`, `token`, `whoami`, `info`, `create-channel`, `use-channel`, `list`, `send`, `thread`, `reply`, `context`, `exit`.
-
-`make e2e` and `make e2e-docker` both include the multi-user scenario that provisions users with different scope sets, creates several channels, sends cross-user messages and thread replies, then validates fetched transcripts and thread contexts against embedded expected-answer fixtures.
-
-## Basic API Example
-
-The examples below use only the required request fields and cover a minimal flow:
-
-1. Create a user with the admin API.
-2. Issue a bearer token for that user.
-3. Create a channel.
-4. Send a root message.
-5. Fetch messages from the channel.
-6. Create a thread from the root message.
-7. Send a reply in the thread.
-8. Fetch the thread context.
-
-For native message endpoints, `sender_user_id` is derived from the authenticated bearer token user. Clients should not attempt to set the sender explicitly. Message responses also include `sender_username` and `sender_display_name` when the sender record exists.
-
-Assumptions:
-
-- The API is running locally with `make run`.
-- The default development admin token is `dev-admin-token`.
-- `jq` is installed to extract IDs from JSON responses.
+Services after startup:
 
 ```bash
 export API_URL="http://localhost:8000"
+export FRONTEND_URL="http://localhost:3001"
 export ADMIN_TOKEN="dev-admin-token"
 ```
 
-Create a user:
+Smoke-check the stack:
+
+```bash
+curl -sS "$API_URL/healthz"
+curl -sS "$FRONTEND_URL/healthz"
+```
+
+Create a user and token:
 
 ```bash
 USER_JSON=$(
@@ -116,11 +45,6 @@ USER_JSON=$(
 
 export USER_ID="$(echo "$USER_JSON" | jq -r '.user_id')"
 echo "$USER_JSON"
-```
-
-Issue a user token with channel and message scopes:
-
-```bash
 TOKEN_JSON=$(
   curl -sS -X POST "$API_URL/admin/v1/tokens" \
     -H "Content-Type: application/json" \
@@ -141,7 +65,7 @@ export ACCESS_TOKEN="$(echo "$TOKEN_JSON" | jq -r '.token')"
 echo "$TOKEN_JSON"
 ```
 
-Create a channel:
+Create a channel and send a message:
 
 ```bash
 CHANNEL_JSON=$(
@@ -155,11 +79,6 @@ CHANNEL_JSON=$(
 
 export CHANNEL_ID="$(echo "$CHANNEL_JSON" | jq -r '.channel_id')"
 echo "$CHANNEL_JSON"
-```
-
-Send a root message:
-
-```bash
 ROOT_MESSAGE_JSON=$(
   curl -sS -X POST "$API_URL/v1/channels/$CHANNEL_ID/messages" \
     -H "Content-Type: application/json" \
@@ -173,14 +92,14 @@ export ROOT_MESSAGE_ID="$(echo "$ROOT_MESSAGE_JSON" | jq -r '.message_id')"
 echo "$ROOT_MESSAGE_JSON"
 ```
 
-Fetch messages from the channel:
+Read the channel:
 
 ```bash
 curl -sS "$API_URL/v1/channels/$CHANNEL_ID/messages?limit=10" \
   -H "Authorization: Bearer $ACCESS_TOKEN"
 ```
 
-Create a thread from the root message:
+Create a thread and read its context:
 
 ```bash
 THREAD_JSON=$(
@@ -194,11 +113,6 @@ THREAD_JSON=$(
 
 export THREAD_ID="$(echo "$THREAD_JSON" | jq -r '.thread_id')"
 echo "$THREAD_JSON"
-```
-
-Send a reply in the thread:
-
-```bash
 curl -sS -X POST "$API_URL/v1/threads/$THREAD_ID/messages" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
@@ -214,9 +128,41 @@ curl -sS "$API_URL/v1/threads/$THREAD_ID/context?limit=10" \
   -H "Authorization: Bearer $ACCESS_TOKEN"
 ```
 
-## Documentation
+Stop the stack:
 
-Detailed design, implementation, deployment, and API contract references live under `docs/`:
+```bash
+make fullstack-down
+```
+
+## Testing
+
+Local:
+
+- `make install`
+- `make test`
+- `make e2e`
+
+Docker:
+
+- `make test-docker`
+- `make test-frontend-docker`
+- `make test-frontend-cli-docker`
+- `make test-frontend-cli-golang-docker`
+- `make e2e-docker`
+
+`make e2e` and `make e2e-docker` both run the full native API end-to-end suite, including the multi-user scenario.
+
+## Make Targets
+
+- `make fullstack-up`: start frontend, API, Redis, MySQL, and Tempo in Docker
+- `make fullstack-down`: stop and remove the full application stack
+- `make run`: run the API locally in the project `venv`
+- `make build`: build the TypeScript CLI binary in Docker
+- `make build-go-cli`: build the Go CLI binary in Docker for the current host OS and architecture
+- `make up`: start the broader deployment test stack
+- `make down`: stop and remove the deployment test stack
+
+## Documentation
 
 - [High-level design](docs/HIGH_LEVEL_DESIGN.md)
 - [Low-level design](docs/LOW_LEVEL_DESIGN.md)
