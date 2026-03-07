@@ -72,6 +72,9 @@ test("renderChatPage includes dedicated chat workflow sections", () => {
   assert.match(html, /function decodeCurrentUserId\(\)/);
   assert.match(html, /function toggleThreadSidebar\(isOpen\)/);
   assert.match(html, /function sortChannelsForSidebar\(items\)/);
+  assert.match(html, /\.workspace-content \{\s*display: grid;\s*gap: 14px;\s*grid-template-rows: auto minmax\(0, 1fr\) auto;/);
+  assert.match(html, /\.channel-section \{\s*display: grid;\s*grid-template-rows: auto auto minmax\(0, 1fr\);/);
+  assert.match(html, /class="channel-section"/);
   assert.match(html, /grid-auto-rows: minmax\(72px, 72px\);/);
   assert.match(html, /align-content: start;/);
   assert.match(html, /return byName;/);

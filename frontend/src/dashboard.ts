@@ -363,13 +363,23 @@ function renderBasePage(title: string, bodyClass: string, content: string): stri
       .workspace-content {
         display: grid;
         gap: 14px;
+        grid-template-rows: auto minmax(0, 1fr) auto;
         min-height: 0;
         flex: 1;
+      }
+      .channel-section {
+        display: grid;
+        grid-template-rows: auto auto minmax(0, 1fr);
+        gap: 10px;
+        min-height: 0;
+        overflow: hidden;
       }
       .sidebar-footer {
         margin-top: auto;
         padding-top: 12px;
         border-top: 1px solid rgba(255,255,255,0.12);
+        min-height: 0;
+        overflow: hidden;
       }
       .stream-toggle-shell {
         display: grid;
@@ -882,7 +892,7 @@ export function renderChatPage(): string {
               </form>
               <div class="status" id="channel-status"></div>
             </div>
-            <div class="stack" style="min-height:0;">
+            <div class="channel-section">
               <div style="display:flex; justify-content:space-between; gap:12px; align-items:center;">
                 <p class="sidebar-section-title" style="margin-bottom:0;">Rooms</p>
                 <button type="button" class="ghost" id="refresh-messages">Refresh</button>
