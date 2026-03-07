@@ -549,6 +549,61 @@ function renderBasePage(title: string, bodyClass: string, content: string): stri
       .composer-shell textarea:focus {
         outline: none;
       }
+      .composer-fields {
+        display: grid;
+        gap: 10px;
+      }
+      .attachment-picker {
+        display: inline-flex;
+        width: fit-content;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        border-radius: 14px;
+        border: 1px dashed rgba(54, 71, 91, 0.28);
+        background: rgba(255,255,255,0.7);
+        cursor: pointer;
+      }
+      .attachment-picker input[type="file"] {
+        display: none;
+      }
+      .attachment-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .attachment-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 10px;
+        border-radius: 999px;
+        background: rgba(29, 42, 55, 0.08);
+        color: var(--text);
+        max-width: 100%;
+      }
+      .attachment-chip span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .attachment-chip button {
+        width: auto;
+        min-height: 28px;
+        padding: 0 10px;
+        border-radius: 999px;
+      }
+      .message-attachments {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .attachment-link {
+        width: auto;
+        min-height: 34px;
+        padding: 0 12px;
+        border-radius: 999px;
+      }
       .thread-sidebar[hidden] {
         display: none;
       }
@@ -664,7 +719,7 @@ export function renderHomePage(config: FrontendConfig): string {
                 </select>
               </label>
               <label>Scopes
-                <input name="scopes" value="channels:read,channels:write,messages:read,messages:write" />
+                <input name="scopes" value="channels:read,channels:write,messages:read,messages:write,files:read,files:write" />
               </label>
             </div>
             <div class="row">
@@ -933,9 +988,16 @@ export function renderChatPage(): string {
           <form class="composer" id="message-form">
             <input type="hidden" name="channelId" id="channel-id-input" />
             <div class="composer-shell">
-              <label style="gap:0;">
-                <textarea name="text" placeholder="Message this room"></textarea>
-              </label>
+              <div class="composer-fields">
+                <label style="gap:0;">
+                  <textarea name="text" placeholder="Message this room"></textarea>
+                </label>
+                <label class="attachment-picker">
+                  <span>Attach files</span>
+                  <input type="file" id="message-files" multiple />
+                </label>
+                <div class="attachment-list" id="message-attachment-list"></div>
+              </div>
               <div style="display:grid; align-content:end;">
                 <button type="submit">Send</button>
               </div>
@@ -962,6 +1024,11 @@ export function renderChatPage(): string {
               <label>Thread reply
                 <textarea name="text" placeholder="Reply in the active thread" style="min-height:92px;"></textarea>
               </label>
+              <label class="attachment-picker">
+                <span>Attach files</span>
+                <input type="file" id="thread-files" multiple />
+              </label>
+              <div class="attachment-list" id="thread-attachment-list"></div>
               <div style="display:grid; align-content:end;">
                 <button type="submit">Send reply</button>
               </div>
@@ -983,11 +1050,15 @@ export function renderChatPage(): string {
       const messageForm = document.querySelector("#message-form");
       const messageStatus = document.querySelector("#message-status");
       const messageList = document.querySelector("#message-list");
+      const messageFilesInput = document.querySelector("#message-files");
+      const messageAttachmentList = document.querySelector("#message-attachment-list");
       const threadPanel = document.querySelector("#thread-panel");
       const threadSidebar = document.querySelector("#thread-sidebar");
       const closeThreadButton = document.querySelector("#close-thread");
       const threadForm = document.querySelector("#thread-form");
       const threadStatus = document.querySelector("#thread-status");
+      const threadFilesInput = document.querySelector("#thread-files");
+      const threadAttachmentList = document.querySelector("#thread-attachment-list");
       const refreshMessagesButton = document.querySelector("#refresh-messages");
       const streamToggle = document.querySelector("#stream-toggle");
       const streamStatus = document.querySelector("#stream-status");
@@ -998,6 +1069,9 @@ export function renderChatPage(): string {
       let eventSource = null;
       let streamEnabled = false;
       let accessToken = "";
+      let pendingMessageFiles = [];
+      let pendingThreadFiles = [];
+      const attachmentCache = new Map();
       function setStatus(element, message, isSuccess = false) {
         element.textContent = message;
         element.className = isSuccess ? "status success" : "status";
@@ -1021,6 +1095,154 @@ export function renderChatPage(): string {
       function formatSenderInitial(message) {
         const label = formatSenderLabel(message).trim();
         return label ? label.charAt(0).toUpperCase() : "?";
+      }
+      function formatFileSize(sizeBytes) {
+        const value = Number(sizeBytes);
+        if (!Number.isFinite(value) || value < 1024) {
+          return String(Math.max(0, Math.round(value || 0))) + " B";
+        }
+        const units = ["KB", "MB", "GB"];
+        let size = value / 1024;
+        let unitIndex = 0;
+        while (size >= 1024 && unitIndex < units.length - 1) {
+          size /= 1024;
+          unitIndex += 1;
+        }
+        return size.toFixed(size >= 10 ? 0 : 1) + " " + units[unitIndex];
+      }
+      function rememberAttachment(fileObject) {
+        if (fileObject?.file_id) {
+          attachmentCache.set(fileObject.file_id, fileObject);
+        }
+      }
+      function renderPendingAttachmentList(container, files, scope) {
+        container.innerHTML = "";
+        if (!files.length) {
+          return;
+        }
+        for (const [index, file] of files.entries()) {
+          const item = document.createElement("div");
+          item.className = "attachment-chip";
+          item.innerHTML = [
+            "<span title='" + escapeClientHtml(file.name) + "'>" + escapeClientHtml(file.name) + " (" + escapeClientHtml(formatFileSize(file.size)) + ")</span>",
+            "<button type='button' class='ghost' data-remove-attachment='" + escapeClientHtml(scope) + "' data-remove-index='" + String(index) + "'>Remove</button>"
+          ].join("");
+          container.appendChild(item);
+        }
+      }
+      function renderMessageAttachments(attachmentIds) {
+        if (!Array.isArray(attachmentIds) || attachmentIds.length === 0) {
+          return "";
+        }
+        const items = attachmentIds.map((attachmentId) => {
+          const metadata = attachmentCache.get(attachmentId);
+          const label = metadata?.filename || attachmentId;
+          return "<button type='button' class='ghost attachment-link' data-download-file-id='" + escapeClientHtml(attachmentId) + "'>" + escapeClientHtml(label) + "</button>";
+        });
+        return "<div class='message-attachments'>" + items.join("") + "</div>";
+      }
+      function updatePendingAttachments(scope) {
+        if (scope === "thread") {
+          renderPendingAttachmentList(threadAttachmentList, pendingThreadFiles, "thread");
+          return;
+        }
+        renderPendingAttachmentList(messageAttachmentList, pendingMessageFiles, "message");
+      }
+      function addPendingFiles(scope, fileList) {
+        const selectedFiles = Array.from(fileList || []).filter((entry) => entry instanceof File);
+        if (selectedFiles.length === 0) {
+          return;
+        }
+        if (scope === "thread") {
+          pendingThreadFiles = pendingThreadFiles.concat(selectedFiles);
+          updatePendingAttachments("thread");
+          threadFilesInput.value = "";
+          return;
+        }
+        pendingMessageFiles = pendingMessageFiles.concat(selectedFiles);
+        updatePendingAttachments("message");
+        messageFilesInput.value = "";
+      }
+      async function uploadPendingFiles(files, statusElement) {
+        const accessToken = getAccessToken();
+        if (!accessToken) {
+          setStatus(sessionStatus, "An access token is required.");
+          return [];
+        }
+        if (!files.length) {
+          return [];
+        }
+        setStatus(statusElement, "Uploading " + String(files.length) + " file(s)...");
+        const uploaded = [];
+        for (const file of files) {
+          const formData = new FormData();
+          formData.set("file", file, file.name);
+          const response = await fetch("/api/files", {
+            method: "POST",
+            headers: { "x-access-token": accessToken },
+            body: formData
+          });
+          const payload = await response.json();
+          if (!response.ok) {
+            throw new Error(formatJson(payload));
+          }
+          rememberAttachment(payload);
+          uploaded.push(payload.file_id);
+        }
+        return uploaded;
+      }
+      function clearPendingFiles(scope) {
+        if (scope === "thread") {
+          pendingThreadFiles = [];
+          threadFilesInput.value = "";
+          updatePendingAttachments("thread");
+          return;
+        }
+        pendingMessageFiles = [];
+        messageFilesInput.value = "";
+        updatePendingAttachments("message");
+      }
+      function parseDownloadFilename(headerValue, fallbackName) {
+        const utf8Match = /filename\\*=UTF-8''([^;]+)/i.exec(String(headerValue || ""));
+        if (utf8Match) {
+          try {
+            return decodeURIComponent(utf8Match[1]);
+          } catch {
+            return utf8Match[1];
+          }
+        }
+        const basicMatch = /filename=\"?([^\";]+)\"?/i.exec(String(headerValue || ""));
+        return basicMatch?.[1] || fallbackName;
+      }
+      async function downloadAttachment(fileId, statusElement) {
+        const accessToken = getAccessToken();
+        if (!accessToken) {
+          setStatus(sessionStatus, "An access token is required.");
+          return;
+        }
+        const response = await fetch("/api/files/" + encodeURIComponent(fileId), {
+          method: "GET",
+          headers: { "x-access-token": accessToken }
+        });
+        if (!response.ok) {
+          const payload = await response.json().catch(() => ({ error: "Unable to download file" }));
+          throw new Error(formatJson(payload));
+        }
+        const blob = await response.blob();
+        const cached = attachmentCache.get(fileId);
+        const filename = parseDownloadFilename(
+          response.headers.get("content-disposition"),
+          cached?.filename || fileId
+        );
+        const objectUrl = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = objectUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(objectUrl);
+        setStatus(statusElement, "Downloaded " + filename + ".", true);
       }
       function decodeCurrentUserId() {
         const rawToken = getAccessToken();
@@ -1191,6 +1413,7 @@ export function renderChatPage(): string {
             "<time class='hint'>" + escapeClientHtml(formatTimestamp(item.created_at)) + "</time>",
             "</div>",
             "<p class='preformatted' style='color:var(--text); margin:0;'>" + escapeClientHtml(item.text) + "</p>",
+            renderMessageAttachments(item.attachments),
             "<div class='message-actions'>",
             "<button type='button' class='ghost thread-trigger' title='" + escapeClientHtml(threadButtonTitle) + "' aria-label='" + escapeClientHtml(threadButtonTitle) + "' data-message-id='" + escapeClientHtml(item.message_id) + "' data-thread-id='" + escapeClientHtml(item.thread_id || "") + "'>" + escapeClientHtml(threadButtonLabel) + "</button>",
             "</div>"
@@ -1227,6 +1450,7 @@ export function renderChatPage(): string {
           "<span class='pill'>root</span>",
           "</div>",
           "<p class='preformatted' style='color:var(--text); margin:12px 0 10px;'>" + escapeClientHtml(rootMessage.text) + "</p>",
+          renderMessageAttachments(rootMessage.attachments),
           "<div class='hint' style='margin-top:8px;'>" + String(context.thread.reply_count) + " replies, last activity " + escapeClientHtml(formatTimestamp(context.thread.last_message_at)) + "</div>",
           "</article>"
         ];
@@ -1242,6 +1466,7 @@ export function renderChatPage(): string {
               "<time class='hint'>" + escapeClientHtml(formatTimestamp(reply.created_at)) + "</time>",
               "</div>",
               "<p class='preformatted' style='color:var(--text); margin:12px 0 10px;'>" + escapeClientHtml(reply.text) + "</p>",
+              renderMessageAttachments(reply.attachments),
               "</article>"
             ].join(""));
           }
@@ -1403,15 +1628,21 @@ export function renderChatPage(): string {
           setStatus(messageStatus, "Select a room before sending.");
           return;
         }
+        if (!text) {
+          setStatus(messageStatus, "Enter a message before sending attachments.");
+          return;
+        }
         setStatus(messageStatus, "Sending message...");
         try {
+          const attachments = await uploadPendingFiles(pendingMessageFiles, messageStatus);
           const response = await fetch("/api/messages", {
             method: "POST",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({
               accessToken,
               channelId,
-              text
+              text,
+              attachments
             })
           });
           const payload = await response.json();
@@ -1420,6 +1651,7 @@ export function renderChatPage(): string {
           }
           messageForm.reset();
           channelIdInput.value = channelId;
+          clearPendingFiles("message");
           setStatus(messageStatus, "Message sent.", true);
           await loadMessages();
         } catch (error) {
@@ -1439,15 +1671,21 @@ export function renderChatPage(): string {
           setStatus(threadStatus, "Open a thread before replying.");
           return;
         }
+        if (!text) {
+          setStatus(threadStatus, "Enter a reply before sending attachments.");
+          return;
+        }
         setStatus(threadStatus, "Sending thread reply...");
         try {
+          const attachments = await uploadPendingFiles(pendingThreadFiles, threadStatus);
           const response = await fetch("/api/threads/messages", {
             method: "POST",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({
               accessToken,
               threadId: activeThread.thread.thread_id,
-              text
+              text,
+              attachments
             })
           });
           const payload = await response.json();
@@ -1455,6 +1693,7 @@ export function renderChatPage(): string {
             throw new Error(formatJson(payload));
           }
           threadForm.reset();
+          clearPendingFiles("thread");
           setStatus(threadStatus, "Thread reply sent.", true);
           await Promise.all([
             loadThreadContext(activeThread.thread.thread_id),
@@ -1473,6 +1712,56 @@ export function renderChatPage(): string {
         renderThreadPanel();
         toggleThreadSidebar(false);
         setStatus(threadStatus, "");
+      });
+      messageFilesInput.addEventListener("change", (event) => {
+        addPendingFiles("message", event.target.files);
+      });
+      threadFilesInput.addEventListener("change", (event) => {
+        addPendingFiles("thread", event.target.files);
+      });
+      messageAttachmentList.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-remove-attachment='message']");
+        if (!button) {
+          return;
+        }
+        const index = Number(button.getAttribute("data-remove-index"));
+        if (Number.isInteger(index) && index >= 0) {
+          pendingMessageFiles.splice(index, 1);
+          updatePendingAttachments("message");
+        }
+      });
+      threadAttachmentList.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-remove-attachment='thread']");
+        if (!button) {
+          return;
+        }
+        const index = Number(button.getAttribute("data-remove-index"));
+        if (Number.isInteger(index) && index >= 0) {
+          pendingThreadFiles.splice(index, 1);
+          updatePendingAttachments("thread");
+        }
+      });
+      messageList.addEventListener("click", async (event) => {
+        const button = event.target.closest("[data-download-file-id]");
+        if (!button) {
+          return;
+        }
+        try {
+          await downloadAttachment(button.getAttribute("data-download-file-id"), messageStatus);
+        } catch (error) {
+          setStatus(messageStatus, error instanceof Error ? error.message : "Unknown error");
+        }
+      });
+      threadPanel.addEventListener("click", async (event) => {
+        const button = event.target.closest("[data-download-file-id]");
+        if (!button) {
+          return;
+        }
+        try {
+          await downloadAttachment(button.getAttribute("data-download-file-id"), threadStatus);
+        } catch (error) {
+          setStatus(threadStatus, error instanceof Error ? error.message : "Unknown error");
+        }
       });
       streamToggle.addEventListener("change", () => {
         if (streamToggle.checked) {

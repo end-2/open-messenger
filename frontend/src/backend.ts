@@ -71,6 +71,16 @@ export type FrontendThreadContext = {
   has_more_replies: boolean;
 };
 
+export type FrontendFileObject = {
+  file_id: string;
+  uploader_user_id: string;
+  filename: string;
+  mime_type: string;
+  size_bytes: number;
+  sha256: string;
+  created_at: string;
+};
+
 type FetchLike = typeof fetch;
 
 export class BackendError extends Error {
@@ -191,6 +201,7 @@ export class BackendClient {
   async createMessage(accessToken: string, channelId: string, payload: {
     text: string;
     thread_id?: string;
+    attachments?: string[];
     idempotency_key?: string;
   }): Promise<FrontendMessage> {
     return this.request<FrontendMessage>(`/v1/channels/${channelId}/messages`, {
@@ -217,6 +228,7 @@ export class BackendClient {
 
   async createThreadMessage(accessToken: string, threadId: string, payload: {
     text: string;
+    attachments?: string[];
     idempotency_key?: string;
   }): Promise<FrontendMessage> {
     return this.request<FrontendMessage>(`/v1/threads/${threadId}/messages`, {
@@ -224,6 +236,51 @@ export class BackendClient {
       accessToken,
       body: payload
     });
+  }
+
+  async uploadFile(accessToken: string, file: Blob, filename: string): Promise<FrontendFileObject> {
+    const formData = new FormData();
+    formData.set("file", file, filename);
+    const response = await this.fetchImpl(`${this.baseUrl}/v1/files`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${accessToken}`
+      },
+      body: formData
+    });
+
+    if (!response.ok) {
+      let details: unknown = null;
+      try {
+        details = await response.json();
+      } catch {
+        details = await response.text();
+      }
+      throw new BackendError(`Backend request failed with status ${response.status}`, response.status, details);
+    }
+
+    return response.json() as Promise<FrontendFileObject>;
+  }
+
+  async downloadFile(accessToken: string, fileId: string): Promise<Response> {
+    const response = await this.fetchImpl(`${this.baseUrl}/v1/files/${fileId}`, {
+      method: "GET",
+      headers: {
+        authorization: `Bearer ${accessToken}`
+      }
+    });
+
+    if (!response.ok) {
+      let details: unknown = null;
+      try {
+        details = await response.json();
+      } catch {
+        details = await response.text();
+      }
+      throw new BackendError(`Backend request failed with status ${response.status}`, response.status, details);
+    }
+
+    return response;
   }
 
   async request<T>(path: string, options: {

@@ -225,3 +225,57 @@ test("BackendClient lists channels", async () => {
   assert.match(calls[0].url, /\/v1\/channels$/);
   assert.equal(calls[0].headers.get("authorization"), "Bearer token");
 });
+
+test("BackendClient uploads and downloads files with bearer auth", async () => {
+  const calls: Array<{ url: string; method: string; headers: Headers; body?: BodyInit | null }> = [];
+  const client = new BackendClient(
+    "http://api.example",
+    "dev-admin-token",
+    async (input, init) => {
+      calls.push({
+        url: String(input),
+        method: String(init?.method || "GET"),
+        headers: new Headers(init?.headers),
+        body: init?.body
+      });
+
+      if (String(input).endsWith("/v1/files")) {
+        return new Response(
+          JSON.stringify({
+            file_id: "fil_1",
+            uploader_user_id: "usr_1",
+            filename: "photo.png",
+            mime_type: "image/png",
+            size_bytes: 4,
+            sha256: "abc",
+            created_at: "2026-03-07T00:00:00Z"
+          }),
+          { status: 201 }
+        );
+      }
+
+      return new Response("file-bytes", {
+        status: 200,
+        headers: {
+          "content-type": "image/png",
+          "content-disposition": "attachment; filename=\"photo.png\""
+        }
+      });
+    }
+  );
+
+  const uploaded = await client.uploadFile("token", new Blob(["data"], { type: "image/png" }), "photo.png");
+  const downloaded = await client.downloadFile("token", "fil_1");
+
+  assert.equal(uploaded.file_id, "fil_1");
+  assert.equal(downloaded.status, 200);
+  assert.equal(await downloaded.text(), "file-bytes");
+  assert.equal(calls.length, 2);
+  assert.match(calls[0].url, /\/v1\/files$/);
+  assert.equal(calls[0].method, "POST");
+  assert.equal(calls[0].headers.get("authorization"), "Bearer token");
+  assert(calls[0].body instanceof FormData);
+  assert.match(calls[1].url, /\/v1\/files\/fil_1$/);
+  assert.equal(calls[1].method, "GET");
+  assert.equal(calls[1].headers.get("authorization"), "Bearer token");
+});

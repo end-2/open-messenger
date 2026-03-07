@@ -302,3 +302,77 @@ test("frontend server proxies channel list route", async () => {
     });
   }
 });
+
+test("frontend server proxies file upload and download routes", async () => {
+  const server = createFrontendServer(
+    {
+      uploadFile: async (accessToken: string, file: Blob, filename: string) => {
+        assert.equal(accessToken, "token");
+        assert.equal(filename, "hello.txt");
+        assert.equal(await file.text(), "hello world");
+        return {
+          file_id: "fil_1",
+          uploader_user_id: "usr_1",
+          filename,
+          mime_type: "text/plain",
+          size_bytes: 11,
+          sha256: "abc",
+          created_at: "2026-03-07T00:00:00Z"
+        };
+      },
+      downloadFile: async (accessToken: string, fileId: string) => {
+        assert.equal(accessToken, "token");
+        assert.equal(fileId, "fil_1");
+        return new Response("hello world", {
+          status: 200,
+          headers: {
+            "content-type": "text/plain",
+            "content-disposition": "attachment; filename=\"hello.txt\""
+          }
+        });
+      }
+    },
+    {
+      home: "<html><body>home</body></html>",
+      chat: "<html><body>chat</body></html>"
+    }
+  );
+
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+
+  try {
+    const address = server.address();
+    assert(address && typeof address === "object");
+    const baseUrl = `http://127.0.0.1:${address.port}`;
+
+    const formData = new FormData();
+    formData.set("file", new File(["hello world"], "hello.txt", { type: "text/plain" }));
+    const uploadResponse = await fetch(`${baseUrl}/api/files`, {
+      method: "POST",
+      headers: { "x-access-token": "token" },
+      body: formData
+    });
+
+    assert.equal(uploadResponse.status, 201);
+    assert.equal((await uploadResponse.json()).file_id, "fil_1");
+
+    const downloadResponse = await fetch(`${baseUrl}/api/files/fil_1`, {
+      headers: { "x-access-token": "token" }
+    });
+
+    assert.equal(downloadResponse.status, 200);
+    assert.equal(downloadResponse.headers.get("content-type"), "text/plain");
+    assert.match(downloadResponse.headers.get("content-disposition") || "", /hello\.txt/);
+    assert.equal(await downloadResponse.text(), "hello world");
+  } finally {
+    await new Promise<void>((resolve, reject) => {
+      server.close((error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve();
+      });
+    });
+  }
+});

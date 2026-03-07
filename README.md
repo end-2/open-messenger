@@ -1,6 +1,6 @@
 # Open Messenger
 
-Open Messenger is a monorepo for a multi-channel messaging platform with a FastAPI backend, a Node.js TypeScript frontend console, and an interactive terminal CLI written in Go. The chat surfaces support channel messaging, root-level thread creation, threaded replies, live event inspection, and sender display-name rendering.
+Open Messenger is a monorepo for a multi-channel messaging platform with a FastAPI backend, a Node.js TypeScript frontend console, and an interactive terminal CLI written in Go. The chat surfaces support channel messaging, file attachments, root-level thread creation, threaded replies, live event inspection, and sender display-name rendering.
 
 ## Quick Start
 
@@ -64,7 +64,9 @@ TOKEN_JSON=$(
         \"channels:read\",
         \"channels:write\",
         \"messages:read\",
-        \"messages:write\"
+        \"messages:write\",
+        \"files:read\",
+        \"files:write\"
       ]
     }"
 )

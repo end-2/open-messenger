@@ -74,7 +74,7 @@ Primary actors:
 
 ### Frontend Console
 
-The frontend provides a browser console for service inspection, token bootstrap, and interactive chat flows.
+The frontend provides a browser console for service inspection, token bootstrap, and interactive chat flows, including file attachment upload and download from the chat workspace.
 
 ### API Layer
 

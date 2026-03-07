@@ -24,6 +24,7 @@ test("renderHomePage includes service and user bootstrap sections", () => {
   assert.match(html, /class="card-list identity-output"/);
   assert.match(html, /id="chat-entry-form"/);
   assert.match(html, /id="chat-entry-token"/);
+  assert.match(html, /files:read,files:write/);
   assert.match(html, /Use saved token/);
   assert.match(html, /\.preformatted \{/);
   assert.match(html, /function escapeClientHtml\(value\)/);
@@ -57,6 +58,11 @@ test("renderChatPage includes dedicated chat workflow sections", () => {
   assert.match(html, /class="scroll-region message-stream" id="message-list"/);
   assert.match(html, /class="feed scroll-region" id="event-feed"/);
   assert.match(html, /class="composer-shell"/);
+  assert.match(html, /id="message-files"/);
+  assert.match(html, /id="message-attachment-list"/);
+  assert.match(html, /id="thread-files"/);
+  assert.match(html, /id="thread-attachment-list"/);
+  assert.match(html, /Attach files/);
   assert.match(html, /class="workspace-name">Open Messenger</);
   assert.doesNotMatch(html, /id="start-stream"/);
   assert.doesNotMatch(html, /id="stop-stream"/);
@@ -68,6 +74,9 @@ test("renderChatPage includes dedicated chat workflow sections", () => {
   assert.doesNotMatch(html, /id="access-token-input"/);
   assert.match(html, /function escapeClientHtml\(value\)/);
   assert.match(html, /function formatSenderLabel\(message\)/);
+  assert.match(html, /function renderPendingAttachmentList\(container, files, scope\)/);
+  assert.match(html, /async function uploadPendingFiles\(files, statusElement\)/);
+  assert.match(html, /async function downloadAttachment\(fileId, statusElement\)/);
   assert.match(html, /function formatIdentityLabel\(identity\)/);
   assert.match(html, /function decodeCurrentUserId\(\)/);
   assert.match(html, /function toggleThreadSidebar\(isOpen\)/);
@@ -87,6 +96,7 @@ test("renderChatPage includes dedicated chat workflow sections", () => {
   assert.match(html, /items\.filter\(\(item\) => !item\.thread_id\)/);
   assert.match(html, /message-row/);
   assert.match(html, /thread-trigger/);
+  assert.match(html, /data-download-file-id/);
   assert.doesNotMatch(html, /\.message-card\.own \.message-author \{\s*flex-direction: row-reverse;/);
   assert.doesNotMatch(html, /Rooms stay in local storage for quick re-entry\./);
   assert.match(html, /Open the room to read messages and start threads\./);

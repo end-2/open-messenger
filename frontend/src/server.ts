@@ -29,6 +29,50 @@ async function readJson(request: IncomingMessage): Promise<JsonRecord> {
   return JSON.parse(Buffer.concat(chunks).toString("utf8")) as JsonRecord;
 }
 
+async function readBuffer(request: IncomingMessage): Promise<Buffer> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of request) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks);
+}
+
+async function readFormData(request: IncomingMessage, url: URL): Promise<FormData> {
+  const body = await readBuffer(request);
+  const webRequest = new Request(url, {
+    method: request.method,
+    headers: new Headers(request.headers as Record<string, string>),
+    body,
+    duplex: "half"
+  });
+  return webRequest.formData();
+}
+
+async function pipeResponse(upstream: Response, response: ServerResponse): Promise<void> {
+  const headers: Record<string, string> = {
+    "content-type": upstream.headers.get("content-type") || "application/octet-stream"
+  };
+  const contentDisposition = upstream.headers.get("content-disposition");
+  if (contentDisposition) {
+    headers["content-disposition"] = contentDisposition;
+  }
+  const contentLength = upstream.headers.get("content-length");
+  if (contentLength) {
+    headers["content-length"] = contentLength;
+  }
+
+  response.writeHead(upstream.status, headers);
+  if (!upstream.body) {
+    response.end();
+    return;
+  }
+
+  for await (const chunk of upstream.body) {
+    response.write(chunk);
+  }
+  response.end();
+}
+
 export function createFrontendServer(client: BackendClient, pages: { home: string; chat: string }) {
   return createServer(async (request, response) => {
     if (!request.url) {
@@ -103,6 +147,7 @@ export function createFrontendServer(client: BackendClient, pages: { home: strin
         const body = await readJson(request);
         const message = await client.createMessage(String(body.accessToken ?? ""), String(body.channelId ?? ""), {
           text: String(body.text ?? ""),
+          attachments: Array.isArray(body.attachments) ? body.attachments.map((value) => String(value)) : [],
           idempotency_key: String(body.idempotencyKey ?? "") || undefined
         });
         sendJson(response, 201, message);
@@ -137,10 +182,47 @@ export function createFrontendServer(client: BackendClient, pages: { home: strin
           String(body.threadId ?? ""),
           {
             text: String(body.text ?? ""),
+            attachments: Array.isArray(body.attachments) ? body.attachments.map((value) => String(value)) : [],
             idempotency_key: String(body.idempotencyKey ?? "") || undefined
           }
         );
         sendJson(response, 201, message);
+        return;
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/files") {
+        const accessToken = String(request.headers["x-access-token"] ?? "").trim();
+        if (!accessToken) {
+          sendJson(response, 400, { error: "x-access-token header is required" });
+          return;
+        }
+
+        const formData = await readFormData(request, new URL(url.pathname, "http://localhost"));
+        const fileEntry = formData.get("file");
+        if (!(fileEntry instanceof File)) {
+          sendJson(response, 400, { error: "file form field is required" });
+          return;
+        }
+
+        const uploaded = await client.uploadFile(accessToken, fileEntry, fileEntry.name);
+        sendJson(response, 201, uploaded);
+        return;
+      }
+
+      if (request.method === "GET" && url.pathname.startsWith("/api/files/")) {
+        const fileId = url.pathname.slice("/api/files/".length).trim();
+        const accessToken = String(request.headers["x-access-token"] ?? "").trim();
+        if (!accessToken) {
+          sendJson(response, 400, { error: "x-access-token header is required" });
+          return;
+        }
+        if (!fileId) {
+          sendJson(response, 400, { error: "file_id is required" });
+          return;
+        }
+
+        const upstream = await client.downloadFile(accessToken, fileId);
+        await pipeResponse(upstream, response);
         return;
       }
 
