@@ -88,8 +88,8 @@ def test_prod_deploy_bundle_uses_redis_mysql_and_monitoring() -> None:
     assert "grafana:" in compose_text
 
 
-def test_deploy_document_covers_profiles_monitoring_and_rollback() -> None:
-    deploy_doc = (ROOT / "docs" / "DEPLOY.md").read_text(encoding="utf-8")
+def test_deployment_document_covers_profiles_monitoring_and_rollback() -> None:
+    deploy_doc = (ROOT / "docs" / "DEPLOYMENT.md").read_text(encoding="utf-8")
 
     assert "Single Instance" in deploy_doc
     assert "Production" in deploy_doc
@@ -97,3 +97,13 @@ def test_deploy_document_covers_profiles_monitoring_and_rollback() -> None:
     assert "Grafana" in deploy_doc
     assert "Rollback Procedure" in deploy_doc
     assert "Operations Runbook" in deploy_doc
+
+
+def test_design_documents_are_split_by_abstraction_level() -> None:
+    high_level_doc = (ROOT / "docs" / "HIGH_LEVEL_DESIGN.md").read_text(encoding="utf-8")
+    low_level_doc = (ROOT / "docs" / "LOW_LEVEL_DESIGN.md").read_text(encoding="utf-8")
+
+    assert "Architecture Overview" in high_level_doc
+    assert "Major Subsystems" in high_level_doc
+    assert "Storage Contracts" in low_level_doc
+    assert "HTTP API Design" in low_level_doc
