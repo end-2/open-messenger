@@ -15,6 +15,9 @@ test("renderHomePage includes service and user bootstrap sections", () => {
   assert.match(html, /User Creation/);
   assert.doesNotMatch(html, /Channels and Messages/);
   assert.match(html, /http:\/\/127\.0\.0\.1:8000/);
+  assert.match(html, /class="home-summary"/);
+  assert.match(html, /class="detail-dialog" id="identity-detail-dialog"/);
+  assert.match(html, /id="identity-detail-content"/);
   assert.match(html, /class="card-list identity-output"/);
   assert.match(html, /id="chat-entry-form"/);
   assert.match(html, /id="chat-entry-token"/);
@@ -25,11 +28,12 @@ test("renderHomePage includes service and user bootstrap sections", () => {
   assert.match(html, /function validateTokenOrWarn\(accessToken\)/);
   assert.match(html, /function renderIdentityOutput\(payload\)/);
   assert.match(html, /function bindIdentityOutputToggles\(\)/);
-  assert.match(html, /data-detail-toggle='identity-details'/);
-  assert.match(html, /id='identity-details' style='display:none; margin-top:12px; gap:12px;'/);
-  assert.match(html, /Hide detail/);
+  assert.match(html, /data-detail-toggle='identity-dialog'/);
+  assert.match(html, /identityDetailDialog\.showModal\(\)/);
+  assert.match(html, /id="close-identity-detail"/);
   assert.match(html, /\/api\/session\/validate/);
-  assert.match(html, /escapeClientHtml\(String\(payload\?\.token\?\.token \|\| ""\)\)/);
+  assert.match(html, /escapeClientHtml\(formatJson\(identity\.user\)\)/);
+  assert.match(html, /escapeClientHtml\(formatJson\(identity\.token\)\)/);
   assert.match(html, /<strong>Token metadata<\/strong>/);
 });
 

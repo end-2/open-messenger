@@ -224,12 +224,43 @@ function renderBasePage(title: string, bodyClass: string, content: string): stri
         min-width: 0;
       }
       .home-grid {
-        grid-template-columns: 1.02fr 0.98fr;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         align-items: start;
+      }
+      .home-summary {
+        margin-bottom: 18px;
       }
       .identity-output {
         overflow: auto;
         max-height: min(32rem, 42dvh);
+      }
+      .detail-dialog {
+        width: min(42rem, calc(100vw - 32px));
+        border: 1px solid rgba(54, 71, 91, 0.16);
+        border-radius: 22px;
+        padding: 0;
+        background: rgba(252, 248, 242, 0.98);
+        box-shadow: 0 28px 80px rgba(33, 25, 18, 0.22);
+      }
+      .detail-dialog::backdrop {
+        background: rgba(33, 25, 18, 0.48);
+        backdrop-filter: blur(4px);
+      }
+      .detail-dialog-shell {
+        display: grid;
+        gap: 16px;
+        padding: 20px;
+      }
+      .detail-dialog-header {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+      }
+      .detail-dialog-close {
+        width: auto;
+        min-height: 40px;
+        padding: 0 14px;
       }
       .viewport-panel {
         height: clamp(32rem, calc(100dvh - 18rem), 52rem);
@@ -492,70 +523,77 @@ export function renderHomePage(config: FrontendConfig): string {
           experience now live in a dedicated chat page with a room-style layout.
         </p>
       </section>
-      <section class="home-grid">
-        <div class="stack">
-          <article class="panel">
-            <h2>Service Snapshot</h2>
-            <div class="metrics" id="service-metrics">
-              <div class="metric"><strong id="service-name">...</strong><span>service</span></div>
-              <div class="metric"><strong id="service-version">...</strong><span>version</span></div>
-              <div class="metric"><strong id="service-environment">...</strong><span>environment</span></div>
-            </div>
-            <p class="mono hint" id="service-details">Connecting to ${apiBaseUrl}</p>
-          </article>
-          <article class="panel">
-            <h2>Open Chat Workspace</h2>
-            <p>
-              Move to the dedicated chat page to create channels, load room history, send messages,
-              and watch the live event stream in a chat-style interface.
-            </p>
-            <form class="stack" id="chat-entry-form">
-              <label>Access token
-                <input class="break-anywhere" name="accessToken" id="chat-entry-token" placeholder="Paste access token" />
-              </label>
-              <div class="row">
-                <button type="submit">Enter chat console</button>
-                <button type="button" class="ghost" id="chat-link-with-token">Use saved token</button>
-              </div>
-            </form>
-            <div class="status" id="chat-entry-status"></div>
-            <p class="hint">If you bootstrap a user here, the returned token is stored locally and can be reused when entering the chat page.</p>
-          </article>
-        </div>
-        <div class="stack">
-          <article class="panel viewport-panel">
-            <h2>User Creation</h2>
-            <form class="stack" id="bootstrap-form">
-              <div class="row">
-                <label>Username
-                  <input name="username" placeholder="alice" required />
-                </label>
-                <label>Display name
-                  <input name="displayName" placeholder="Alice" />
-                </label>
-              </div>
-              <div class="row">
-                <label>Token type
-                  <select name="tokenType">
-                    <option value="user_token">user_token</option>
-                    <option value="bot_token">bot_token</option>
-                    <option value="service_token">service_token</option>
-                  </select>
-                </label>
-                <label>Scopes
-                  <input name="scopes" value="channels:read,channels:write,messages:read,messages:write" />
-                </label>
-              </div>
-              <div class="row">
-                <button type="submit">Create user and token</button>
-                <a class="button-link ghost" href="/chat">Go to channels and messages</a>
-              </div>
-            </form>
-            <div class="status" id="bootstrap-status"></div>
-            <ul class="card-list identity-output" id="identity-list"></ul>
-          </article>
-        </div>
+      <section class="home-summary">
+        <article class="panel">
+          <h2>Service Snapshot</h2>
+          <div class="metrics" id="service-metrics">
+            <div class="metric"><strong id="service-name">...</strong><span>service</span></div>
+            <div class="metric"><strong id="service-version">...</strong><span>version</span></div>
+            <div class="metric"><strong id="service-environment">...</strong><span>environment</span></div>
+          </div>
+          <p class="mono hint" id="service-details">Connecting to ${apiBaseUrl}</p>
+        </article>
       </section>
+      <section class="home-grid">
+        <article class="panel viewport-panel">
+          <h2>Open Chat Workspace</h2>
+          <p>
+            Move to the dedicated chat page to create channels, load room history, send messages,
+            and watch the live event stream in a chat-style interface.
+          </p>
+          <form class="stack" id="chat-entry-form">
+            <label>Access token
+              <input class="break-anywhere" name="accessToken" id="chat-entry-token" placeholder="Paste access token" />
+            </label>
+            <div class="row">
+              <button type="submit">Enter chat console</button>
+              <button type="button" class="ghost" id="chat-link-with-token">Use saved token</button>
+            </div>
+          </form>
+          <div class="status" id="chat-entry-status"></div>
+          <p class="hint">If you bootstrap a user here, the returned token is stored locally and can be reused when entering the chat page.</p>
+        </article>
+        <article class="panel viewport-panel">
+          <h2>User Creation</h2>
+          <form class="stack" id="bootstrap-form">
+            <div class="row">
+              <label>Username
+                <input name="username" placeholder="alice" required />
+              </label>
+              <label>Display name
+                <input name="displayName" placeholder="Alice" />
+              </label>
+            </div>
+            <div class="row">
+              <label>Token type
+                <select name="tokenType">
+                  <option value="user_token">user_token</option>
+                  <option value="bot_token">bot_token</option>
+                  <option value="service_token">service_token</option>
+                </select>
+              </label>
+              <label>Scopes
+                <input name="scopes" value="channels:read,channels:write,messages:read,messages:write" />
+              </label>
+            </div>
+            <div class="row">
+              <button type="submit">Create user and token</button>
+              <a class="button-link ghost" href="/chat">Go to channels and messages</a>
+            </div>
+          </form>
+          <div class="status" id="bootstrap-status"></div>
+          <ul class="card-list identity-output" id="identity-list"></ul>
+        </article>
+      </section>
+      <dialog class="detail-dialog" id="identity-detail-dialog">
+        <div class="detail-dialog-shell">
+          <div class="detail-dialog-header">
+            <strong>Identity Detail</strong>
+            <button type="button" class="ghost detail-dialog-close" id="close-identity-detail">Close</button>
+          </div>
+          <div id="identity-detail-content"></div>
+        </div>
+      </dialog>
     </main>
     <script type="module">
       const serviceName = document.querySelector("#service-name");
@@ -569,6 +607,9 @@ export function renderHomePage(config: FrontendConfig): string {
       const chatEntryForm = document.querySelector("#chat-entry-form");
       const chatEntryToken = document.querySelector("#chat-entry-token");
       const chatEntryStatus = document.querySelector("#chat-entry-status");
+      const identityDetailDialog = document.querySelector("#identity-detail-dialog");
+      const identityDetailContent = document.querySelector("#identity-detail-content");
+      const closeIdentityDetail = document.querySelector("#close-identity-detail");
 
       function setStatus(element, message, isSuccess = false) {
         element.textContent = message;
@@ -592,34 +633,39 @@ export function renderHomePage(config: FrontendConfig): string {
         }
       }
       function renderIdentityOutput(payload) {
-        const userJson = escapeClientHtml(formatJson(payload.user));
-        const tokenJson = escapeClientHtml(formatJson(payload.token));
         const tokenValue = escapeClientHtml(String(payload?.token?.token || ""));
         return [
           "<li>",
           "<strong>Token</strong>",
           "<pre class='mono preformatted'>" + tokenValue + "</pre>",
-          "<button type='button' class='ghost' data-detail-toggle='identity-details'>Detail</button>",
-          "<div id='identity-details' style='display:none; margin-top:12px; gap:12px;'>",
-          "<div><strong>User</strong><pre class='mono preformatted'>" + userJson + "</pre></div>",
-          "<div><strong>Token metadata</strong><pre class='mono preformatted'>" + tokenJson + "</pre></div>",
-          "</div>",
+          "<button type='button' class='ghost' data-detail-toggle='identity-dialog'>Detail</button>",
           "</li>"
         ].join("");
       }
       function bindIdentityOutputToggles() {
         const detailButton = identityList.querySelector("[data-detail-toggle]");
         detailButton?.addEventListener("click", () => {
-          const targetId = detailButton.getAttribute("data-detail-toggle");
-          const detailPanel = targetId ? document.getElementById(targetId) : null;
-          if (!detailPanel) {
+          const identity = readStoredIdentity();
+          if (!identityDetailDialog || !identityDetailContent || !identity) {
             return;
           }
-          const isOpen = detailPanel.style.display !== "none";
-          detailPanel.style.display = isOpen ? "none" : "grid";
-          detailButton.textContent = isOpen ? "Detail" : "Hide detail";
+          identityDetailContent.innerHTML = [
+            "<div style='display:grid; gap:12px;'>",
+            "<div><strong>User</strong><pre class='mono preformatted'>" + escapeClientHtml(formatJson(identity.user)) + "</pre></div>",
+            "<div><strong>Token metadata</strong><pre class='mono preformatted'>" + escapeClientHtml(formatJson(identity.token)) + "</pre></div>",
+            "</div>"
+          ].join("");
+          identityDetailDialog.showModal();
         });
       }
+      closeIdentityDetail?.addEventListener("click", () => {
+        identityDetailDialog?.close();
+      });
+      identityDetailDialog?.addEventListener("click", (event) => {
+        if (event.target === identityDetailDialog) {
+          identityDetailDialog.close();
+        }
+      });
       async function validateTokenOrWarn(accessToken) {
         const response = await fetch("/api/session/validate", {
           method: "POST",
