@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     token_signing_secret: str = "dev-signing-secret"
     rate_limit_max_requests: int = 60
     rate_limit_window_seconds: int = 60
+    tracing_enabled: bool = False
+    tracing_service_name: str = "open-messenger-api"
+    otlp_traces_endpoint: str = "http://localhost:4318/v1/traces"
 
     model_config = SettingsConfigDict(
         env_file=".env",

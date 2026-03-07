@@ -29,3 +29,7 @@ class EventBus:
     async def unsubscribe(self, queue: asyncio.Queue[dict[str, Any]]) -> None:
         with self._lock:
             self._subscribers.discard(queue)
+
+    def subscriber_count(self) -> int:
+        with self._lock:
+            return len(self._subscribers)

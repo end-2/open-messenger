@@ -17,7 +17,7 @@ help:
 	@echo "  test-docker  Run unit tests in Docker"
 	@echo "  e2e-docker   Run end-to-end API checks in Docker"
 	@echo "  test-frontend-docker  Run frontend unit test in Docker"
-	@echo "  up           Start deployment test stack (API, Redis, MySQL)"
+	@echo "  up           Start deployment test stack (API, Redis, MySQL, Prometheus, Loki, Tempo, Grafana)"
 	@echo "  down         Stop and remove deployment test stack"
 	@echo "  clean        Remove local test artifacts"
 
@@ -56,7 +56,7 @@ test-frontend-docker:
 	docker run --rm -v "$$PWD":/workspace -w /workspace node:22-alpine node --test frontend/src/index.test.js
 
 up:
-	docker compose up --build -d api redis mysql
+	docker compose up --build -d api redis mysql prometheus loki promtail tempo grafana
 
 down:
 	docker compose down --volumes --remove-orphans

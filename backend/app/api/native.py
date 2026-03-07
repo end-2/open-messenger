@@ -6,13 +6,15 @@ from pathlib import Path
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Response, UploadFile, WebSocket, status
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from starlette.websockets import WebSocketDisconnect
 
 from app.auth import AuthContext, require_scopes
 from app.config import Settings, get_settings
 from app.domain import Channel, Thread
 from app.errors import api_error
+from app.observability import check_readiness
 
 from .helpers import (
     authenticate_websocket_token,
@@ -72,6 +74,7 @@ async def stream_events(
 ) -> StreamingResponse:
     event_bus = request.app.state.event_bus
     queue: Queue[dict[str, Any]] = await event_bus.subscribe()
+    request.app.state.metrics.set_subscriber_count("sse", event_bus.subscriber_count())
 
     async def event_stream():
         yield ": connected\n\n"
@@ -84,9 +87,15 @@ async def stream_events(
                 except TimeoutError:
                     yield ": keep-alive\n\n"
                     continue
+                request.app.state.metrics.observe_event_delivery(
+                    "sse",
+                    str(event["type"]),
+                    str(event["occurred_at"]),
+                )
                 yield format_sse_event(event)
         finally:
             await event_bus.unsubscribe(queue)
+            request.app.state.metrics.set_subscriber_count("sse", event_bus.subscriber_count())
 
     return StreamingResponse(
         event_stream(),
@@ -110,6 +119,7 @@ async def websocket_events(websocket: WebSocket) -> None:
     await websocket.accept()
     event_bus = websocket.app.state.event_bus
     queue: Queue[dict[str, Any]] = await event_bus.subscribe()
+    websocket.app.state.metrics.set_subscriber_count("ws", event_bus.subscriber_count())
     control_queue: asyncio.Queue[str | None] = asyncio.Queue()
     receiver_task = asyncio.create_task(_receive_websocket_messages(websocket, control_queue))
 
@@ -125,6 +135,11 @@ async def websocket_events(websocket: WebSocket) -> None:
             try:
                 if queue_task in done:
                     event = queue_task.result()
+                    websocket.app.state.metrics.observe_event_delivery(
+                        "ws",
+                        str(event["type"]),
+                        str(event["occurred_at"]),
+                    )
                     await websocket.send_json(event)
                     continue
 
@@ -141,11 +156,29 @@ async def websocket_events(websocket: WebSocket) -> None:
         receiver_task.cancel()
         await asyncio.gather(receiver_task, return_exceptions=True)
         await event_bus.unsubscribe(queue)
+        websocket.app.state.metrics.set_subscriber_count("ws", event_bus.subscriber_count())
 
 
 @router.get("/healthz")
 def healthz() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@router.get("/readyz")
+async def readyz(request: Request) -> JSONResponse:
+    ready, details = await check_readiness(request.app)
+    return JSONResponse(
+        status_code=status.HTTP_200_OK if ready else status.HTTP_503_SERVICE_UNAVAILABLE,
+        content={"status": "ok" if ready else "error", "checks": details},
+    )
+
+
+@router.get("/metrics")
+def metrics(request: Request) -> Response:
+    return Response(
+        content=generate_latest(request.app.state.metrics.registry),
+        media_type=CONTENT_TYPE_LATEST,
+    )
 
 
 @router.get("/v1/info")

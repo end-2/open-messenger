@@ -44,7 +44,7 @@ make e2e
 
 ## Docker Setup
 
-Start deployment test stack (API + Redis + MySQL):
+Start deployment test stack (API + Redis + MySQL + Prometheus + Loki + Tempo + Grafana):
 
 ```bash
 make up
@@ -80,6 +80,8 @@ After `make run` or `make up`:
 
 ```bash
 curl http://localhost:8000/healthz
+curl http://localhost:8000/readyz
+curl http://localhost:8000/metrics
 curl http://localhost:8000/v1/info
 ```
 
@@ -214,7 +216,8 @@ Errors are standardized as:
 }
 ```
 
-When request volume exceeds the configured window on `/v1` or `/admin/v1`, the API returns `429` with `code=rate_limited` and a `Retry-After` header. The limiter keys by bearer token, admin token, or client IP when no token is present. `/healthz` is excluded.
+When request volume exceeds the configured window on `/v1` or `/admin/v1`, the API returns `429` with `code=rate_limited` and a `Retry-After` header. The limiter keys by bearer token, admin token, or client IP when no token is present. `/healthz`, `/readyz`, and `/metrics` are excluded.
+Every HTTP response includes `X-Request-Id`. If the client sends `X-Request-Id`, the API preserves and propagates it; otherwise the API generates one. Application logs are emitted as JSON on stdout for collection by Loki.
 
 `/v1/info` reports the configured backend names and selected store implementation classes.
 `memory`, `file`, `redis`, `mysql`, and `local` file-binary storage are implemented.
@@ -239,3 +242,29 @@ Message attachments must reference existing file IDs returned by `POST /v1/files
 - `OPEN_MESSENGER_TOKEN_SIGNING_SECRET`: signing secret for JWT-like token signature verification
 - `OPEN_MESSENGER_RATE_LIMIT_MAX_REQUESTS`: max requests per identity within the rate limit window
 - `OPEN_MESSENGER_RATE_LIMIT_WINDOW_SECONDS`: sliding window size in seconds for rate limiting
+- `OPEN_MESSENGER_TRACING_ENABLED`: enable OpenTelemetry trace export
+- `OPEN_MESSENGER_TRACING_SERVICE_NAME`: logical service name attached to traces
+- `OPEN_MESSENGER_OTLP_TRACES_ENDPOINT`: OTLP/HTTP trace export endpoint, for example `http://tempo:4318/v1/traces`
+
+## Monitoring Stack
+
+`docker compose` now includes the following observability services:
+
+- Prometheus at `http://localhost:9090` scraping `/metrics`
+- Loki at `http://localhost:3100` ingesting API container logs through Promtail
+- Tempo at `http://localhost:3200` receiving OTLP traces from the API
+- Grafana at `http://localhost:3000` with preprovisioned Prometheus, Loki, and Tempo datasources
+
+Default Grafana credentials:
+
+- username: `admin`
+- password: `admin`
+
+Useful Prometheus metrics:
+
+- `open_messenger_http_request_duration_seconds`
+- `open_messenger_http_requests_total`
+- `open_messenger_http_request_errors_total`
+- `open_messenger_message_events_total`
+- `open_messenger_event_delivery_lag_seconds`
+- `open_messenger_realtime_active_subscribers`

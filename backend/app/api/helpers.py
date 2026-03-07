@@ -84,6 +84,10 @@ async def publish_event(
 ) -> dict[str, Any]:
     event = build_event(event_type, occurred_at, data)
     await request.app.state.event_bus.publish(event)
+    request.app.state.metrics.observe_event_published(
+        event_type,
+        origin=str(data.get("compat_origin") or "native"),
+    )
     return event
 
 

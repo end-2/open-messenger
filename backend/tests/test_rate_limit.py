@@ -93,3 +93,20 @@ def test_healthz_is_not_rate_limited(monkeypatch) -> None:
 
     assert first.status_code == 200
     assert second.status_code == 200
+
+
+def test_readiness_and_metrics_are_not_rate_limited(monkeypatch) -> None:
+    monkeypatch.setenv("OPEN_MESSENGER_RATE_LIMIT_MAX_REQUESTS", "1")
+    monkeypatch.setenv("OPEN_MESSENGER_RATE_LIMIT_WINDOW_SECONDS", "60")
+
+    client = TestClient(create_app())
+
+    first_ready = client.get("/readyz")
+    second_ready = client.get("/readyz")
+    first_metrics = client.get("/metrics")
+    second_metrics = client.get("/metrics")
+
+    assert first_ready.status_code == 200
+    assert second_ready.status_code == 200
+    assert first_metrics.status_code == 200
+    assert second_metrics.status_code == 200

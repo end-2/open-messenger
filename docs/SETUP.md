@@ -12,6 +12,8 @@ This document describes reproducible setup and test execution for the current sc
    - `make run`
 4. Run end-to-end API checks (starts temporary API server automatically):
    - `make e2e`
+5. Optional: enable OTLP trace export to a local Tempo instance:
+   - `OPEN_MESSENGER_TRACING_ENABLED=true OPEN_MESSENGER_OTLP_TRACES_ENDPOINT=http://localhost:4318/v1/traces make run`
 
 Optional: run with file-backed storage:
 - `OPEN_MESSENGER_CONTENT_BACKEND=file OPEN_MESSENGER_METADATA_BACKEND=file OPEN_MESSENGER_STORAGE_DIR=data/storage make run`
@@ -30,6 +32,7 @@ Optional: tighten or disable rate limiting during local runs:
 
 1. Start deployment test stack:
    - `make up`
+   - This starts API, Redis, MySQL, Prometheus, Loki, Promtail, Tempo, and Grafana.
 2. Run backend unit tests in a container:
    - `make test-docker`
 3. Run backend end-to-end API checks in a container:
@@ -42,6 +45,8 @@ Optional: tighten or disable rate limiting during local runs:
 ## Smoke Checks
 
 - `curl http://localhost:8000/healthz`
+- `curl http://localhost:8000/readyz`
+- `curl http://localhost:8000/metrics`
 - `curl http://localhost:8000/v1/info`
 - `curl -N http://localhost:8000/v1/events/stream -H "Authorization: Bearer <token>"`
 - `curl -X POST http://localhost:8000/v1/channels -H "Content-Type: application/json" -H "Authorization: Bearer <token>" -d '{"name":"general"}'`
@@ -69,3 +74,10 @@ async def main():
 asyncio.run(main())
 PY
 ```
+
+Monitoring endpoints after `make up`:
+
+- Prometheus: `http://localhost:9090`
+- Loki: `http://localhost:3100`
+- Tempo: `http://localhost:3200`
+- Grafana: `http://localhost:3000` (`admin` / `admin`)

@@ -8,6 +8,8 @@ services:
       OPEN_MESSENGER_ENVIRONMENT: dev
       OPEN_MESSENGER_CONTENT_BACKEND: memory
       OPEN_MESSENGER_METADATA_BACKEND: memory
+      OPEN_MESSENGER_TRACING_ENABLED: "true"
+      OPEN_MESSENGER_OTLP_TRACES_ENDPOINT: http://tempo:4318/v1/traces
     ports:
       - "8000:8000"
     depends_on:
@@ -15,6 +17,8 @@ services:
         condition: service_healthy
       mysql:
         condition: service_healthy
+      tempo:
+        condition: service_started
     healthcheck:
       test:
         [
@@ -54,6 +58,74 @@ services:
       timeout: 5s
       retries: 10
 
+  prometheus:
+    image: prom/prometheus:v3.2.1
+    container_name: open-messenger-prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./ops/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      api:
+        condition: service_healthy
+
+  loki:
+    image: grafana/loki:3.4.1
+    container_name: open-messenger-loki
+    command:
+      - -config.file=/etc/loki/loki-config.yml
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./ops/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - loki_data:/loki
+
+  promtail:
+    image: grafana/promtail:3.4.1
+    container_name: open-messenger-promtail
+    command:
+      - -config.file=/etc/promtail/promtail-config.yml
+    volumes:
+      - ./ops/promtail/promtail-config.yml:/etc/promtail/promtail-config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      loki:
+        condition: service_started
+
+  tempo:
+    image: grafana/tempo:2.7.1
+    container_name: open-messenger-tempo
+    command:
+      - -config.file=/etc/tempo/tempo.yml
+    ports:
+      - "3200:3200"
+      - "4317:4317"
+      - "4318:4318"
+    volumes:
+      - ./ops/tempo/tempo.yml:/etc/tempo/tempo.yml:ro
+      - tempo_data:/var/tempo
+
+  grafana:
+    image: grafana/grafana:11.5.2
+    container_name: open-messenger-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./ops/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      prometheus:
+        condition: service_started
+      loki:
+        condition: service_started
+      tempo:
+        condition: service_started
+
   test:
     build:
       context: .
@@ -83,3 +155,6 @@ services:
 
 volumes:
   mysql_data:
+  loki_data:
+  tempo_data:
+  grafana_data:

@@ -97,12 +97,13 @@
 - [x] 재시도 안전성 검증(멱등 처리) 테스트
 - [x] 에이전트 사용 예시(요청/응답 샘플) 문서화
 
-## 11. 관측성/운영
+## 11. Observability / Operations
 
-- [ ] 구조화 로그(JSON) 적용
-- [ ] `x-request-id` 전파 구현
-- [ ] 메트릭 수집: p50/p95/p99 지연시간, 에러율, 메시지 처리량, 이벤트 lag
-- [ ] 헬스체크/레디니스 엔드포인트 추가
+- [x] Structured logs (JSON) applied
+- [x] `x-request-id` propagation implemented
+- [x] Metrics collection: p50/p95/p99 latency, error rate, message throughput, event lag
+- [x] Health and readiness endpoints added
+- [x] Docker Compose monitoring stack added: Prometheus, Loki, Tempo, Grafana
 
 ## 12. 테스트
 
