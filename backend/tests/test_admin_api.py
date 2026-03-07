@@ -287,3 +287,66 @@ def test_rotate_token_works_with_file_backends(monkeypatch, tmp_path) -> None:
     assert rotated is not None
     assert original["revoked_at"] is not None
     assert rotated["revoked_at"] is None
+
+
+def test_revoked_token_can_no_longer_access_native_api() -> None:
+    client = TestClient(create_app())
+    user = _create_user(client, username="revoked-native-user")
+
+    token_response = client.post(
+        "/admin/v1/tokens",
+        json={
+            "user_id": user["user_id"],
+            "token_type": "user_token",
+            "scopes": ["channels:write"],
+        },
+        headers=_admin_headers(),
+    )
+    assert token_response.status_code == 201
+    token_payload = token_response.json()
+    headers = {"Authorization": f"Bearer {token_payload['token']}"}
+
+    allowed = client.post("/v1/channels", json={"name": "allowed"}, headers=headers)
+    assert allowed.status_code == 201
+
+    revoke_response = client.delete(
+        f"/admin/v1/tokens/{token_payload['token_id']}",
+        headers=_admin_headers(),
+    )
+    assert revoke_response.status_code == 204
+
+    denied = client.post("/v1/channels", json={"name": "denied"}, headers=headers)
+    assert denied.status_code == 401
+
+
+def test_rotated_token_invalidates_old_plaintext_token_for_native_api() -> None:
+    client = TestClient(create_app())
+    user = _create_user(client, username="rotated-native-user")
+
+    create_response = client.post(
+        "/admin/v1/tokens",
+        json={
+            "user_id": user["user_id"],
+            "token_type": "user_token",
+            "scopes": ["channels:write"],
+        },
+        headers=_admin_headers(),
+    )
+    assert create_response.status_code == 201
+    original_token = create_response.json()
+
+    rotate_response = client.post(
+        f"/admin/v1/tokens/{original_token['token_id']}/rotate",
+        headers=_admin_headers(),
+    )
+    assert rotate_response.status_code == 201
+    rotated_token = rotate_response.json()
+
+    old_headers = {"Authorization": f"Bearer {original_token['token']}"}
+    new_headers = {"Authorization": f"Bearer {rotated_token['token']}"}
+
+    denied = client.post("/v1/channels", json={"name": "stale-token"}, headers=old_headers)
+    allowed = client.post("/v1/channels", json={"name": "fresh-token"}, headers=new_headers)
+
+    assert denied.status_code == 401
+    assert allowed.status_code == 201

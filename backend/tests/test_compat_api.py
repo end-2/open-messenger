@@ -100,6 +100,15 @@ def test_slack_files_upload_creates_file_and_message() -> None:
     assert payload["file"]["name"] == "slack.txt"
     assert payload["message"]["channel"] == channel_id
 
+    listed = client.get(
+        f"/v1/channels/{channel_id}/messages",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert listed.status_code == 200
+    items = listed.json()["items"]
+    assert [item["compat_origin"] for item in items] == ["slack"]
+    assert items[0]["attachments"] == [payload["file"]["id"]]
+
 
 def test_telegram_send_message_and_reply_mapping() -> None:
     client = TestClient(create_app())
@@ -151,6 +160,15 @@ def test_telegram_send_document_uploads_file() -> None:
     assert payload["ok"] is True
     assert payload["result"]["document"]["file_name"] == "spec.txt"
 
+    listed = client.get(
+        f"/v1/channels/{channel_id}/messages",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert listed.status_code == 200
+    items = listed.json()["items"]
+    assert [item["compat_origin"] for item in items] == ["telegram"]
+    assert items[0]["attachments"] == [payload["result"]["document"]["file_id"]]
+
 
 def test_discord_create_message_and_reply_mapping() -> None:
     client = TestClient(create_app())
@@ -200,3 +218,72 @@ def test_discord_create_message_with_attachment() -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["attachments"][0]["filename"] == "discord.txt"
+    listed = client.get(
+        f"/v1/channels/{channel_id}/messages",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert listed.status_code == 200
+    items = listed.json()["items"]
+    assert [item["compat_origin"] for item in items] == ["discord"]
+    assert items[0]["attachments"] == [payload["attachments"][0]["id"]]
+
+
+def test_slack_reply_reuses_same_internal_thread() -> None:
+    client = TestClient(create_app())
+    token, _ = _bootstrap_user_token(client, "slack-thread-reuse")
+    channel_id = _create_channel(client, token)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    root = client.post(
+        "/compat/slack/chat.postMessage",
+        json={"channel": channel_id, "text": "root"},
+        headers=headers,
+    )
+    assert root.status_code == 200
+    thread_ts = root.json()["ts"]
+
+    first_reply = client.post(
+        "/compat/slack/chat.postMessage",
+        json={"channel": channel_id, "text": "reply-1", "thread_ts": thread_ts},
+        headers=headers,
+    )
+    second_reply = client.post(
+        "/compat/slack/chat.postMessage",
+        json={"channel": channel_id, "text": "reply-2", "thread_ts": thread_ts},
+        headers=headers,
+    )
+
+    assert first_reply.status_code == 200
+    assert second_reply.status_code == 200
+
+    listed = client.get(f"/v1/channels/{channel_id}/messages", headers=headers)
+    items = listed.json()["items"]
+    assert items[1]["thread_id"] == items[2]["thread_id"]
+
+
+def test_compat_reply_to_unknown_message_returns_404() -> None:
+    client = TestClient(create_app())
+    token, _ = _bootstrap_user_token(client, "compat-missing-reply")
+    channel_id = _create_channel(client, token)
+
+    slack = client.post(
+        "/compat/slack/chat.postMessage",
+        json={"channel": channel_id, "text": "reply", "thread_ts": "1710000000.000001"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    telegram = client.post(
+        f"/compat/telegram/bot{token}/sendMessage",
+        json={"chat_id": channel_id, "text": "reply", "reply_to_message_id": 999},
+    )
+    discord = client.post(
+        f"/compat/discord/channels/{channel_id}/messages",
+        json={"content": "reply", "message_reference": {"message_id": "999"}},
+        headers={"Authorization": f"Bot {token}"},
+    )
+
+    assert slack.status_code == 404
+    assert telegram.status_code == 404
+    assert discord.status_code == 404
+    assert slack.json()["code"] == "message_not_found"
+    assert telegram.json()["code"] == "message_not_found"
+    assert discord.json()["code"] == "message_not_found"

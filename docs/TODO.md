@@ -107,11 +107,11 @@
 
 ## 12. 테스트
 
-- [ ] Storage backend contract test 작성
-- [ ] Native/Admin API 통합 테스트 작성
-- [ ] Compatibility API 회귀 테스트 작성 (Slack/Telegram/Discord 기본 시나리오)
-- [ ] 토큰 스코프/권한 테스트 작성
-- [ ] 대용량 메시지/파일 부하 테스트 작성
+- [x] Storage backend contract test 작성
+- [x] Native/Admin API 통합 테스트 작성
+- [x] Compatibility API 회귀 테스트 작성 (Slack/Telegram/Discord 기본 시나리오)
+- [x] 토큰 스코프/권한 테스트 작성
+- [x] 대용량 메시지/파일 부하 테스트 작성
 
 ## 13. 배포 준비
 
