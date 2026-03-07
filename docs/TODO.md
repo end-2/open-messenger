@@ -91,11 +91,11 @@
 
 ## 10. AI Agent 친화 API
 
-- [ ] Batch 조회 API: `POST /v1/messages:batchGet`
-- [ ] Batch 생성 API: `POST /v1/messages:batchCreate`
-- [ ] 스레드 컨텍스트 API: `GET /v1/threads/{thread_id}/context`
-- [ ] 재시도 안전성 검증(멱등 처리) 테스트
-- [ ] 에이전트 사용 예시(요청/응답 샘플) 문서화
+- [x] Batch 조회 API: `POST /v1/messages:batchGet`
+- [x] Batch 생성 API: `POST /v1/messages:batchCreate`
+- [x] 스레드 컨텍스트 API: `GET /v1/threads/{thread_id}/context`
+- [x] 재시도 안전성 검증(멱등 처리) 테스트
+- [x] 에이전트 사용 예시(요청/응답 샘플) 문서화
 
 ## 11. 관측성/운영
 

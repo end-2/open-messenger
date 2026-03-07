@@ -287,6 +287,15 @@ async def ensure_attachment_files_exist(
             )
 
 
+async def hydrate_message_response(
+    stored_message: dict[str, Any],
+    content_store: Any,
+) -> dict[str, Any]:
+    content_ref = str(stored_message["content_ref"])
+    content_payload = await content_store.get(content_ref) or {}
+    return build_message_response(stored_message, content_payload)
+
+
 async def ensure_thread_for_root_message(
     request: Request,
     metadata_store: Any,

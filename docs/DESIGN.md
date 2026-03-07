@@ -230,6 +230,9 @@ Base path: `/v1`
 6. `POST /threads/{thread_id}/messages`
 7. `POST /files` (multipart)
 8. `GET /files/{file_id}`
+9. `POST /messages:batchGet`
+10. `POST /messages:batchCreate`
+11. `GET /threads/{thread_id}/context?limit=`
 
 일반 `/v1` 경로에서는 `user/token` 생성 API를 제공하지 않는다.
 
@@ -343,8 +346,12 @@ Current implementation notes:
 - Native message pagination is implemented in `GET /v1/channels/{channel_id}/messages`.
 - The API layer computes `next_cursor` from the last item of a full page.
 - All metadata store implementations expose `list_channel_messages(channel_id, cursor, limit)`.
+- All metadata store implementations expose `list_thread_messages(channel_id, thread_id, limit)` for thread context retrieval.
 - `memory`, `file`, and `mysql` metadata backends already implement the same cursor-based contract.
 - Realtime delivery is available via both `GET /v1/events/stream` and `GET /v1/events/ws`.
+- `POST /v1/messages:batchGet` returns found messages in request order plus `not_found_ids`.
+- `POST /v1/messages:batchCreate` accepts multiple native-style messages with per-item `channel_id`; idempotency is applied per item using the existing `idempotency_key`.
+- `GET /v1/threads/{thread_id}/context?limit=` returns the thread metadata, the root message, the oldest replies up to `limit`, and `has_more_replies`.
 
 ## 9. 이벤트 및 실시간
 

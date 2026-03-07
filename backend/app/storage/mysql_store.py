@@ -239,6 +239,30 @@ class MySQLMetadataStore(MetadataStore):
                 items.append(payload)
         return items
 
+    async def list_thread_messages(
+        self,
+        channel_id: str,
+        thread_id: str,
+        limit: int,
+    ) -> list[dict[str, Any]]:
+        rows = await self._run_fetchall(
+            f"""
+            SELECT payload
+            FROM {self._table("messages")}
+            WHERE channel_id=%s
+              AND JSON_UNQUOTE(JSON_EXTRACT(payload, '$.thread_id'))=%s
+            ORDER BY sequence_id ASC
+            LIMIT %s
+            """,
+            (channel_id, thread_id, max(limit, 0)),
+        )
+        items: list[dict[str, Any]] = []
+        for row in rows:
+            payload = self._deserialize_row(row)
+            if payload is not None:
+                items.append(payload)
+        return items
+
     async def find_message_by_idempotency(
         self,
         channel_id: str,

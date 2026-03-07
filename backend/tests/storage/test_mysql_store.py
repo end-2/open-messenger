@@ -169,6 +169,19 @@ class InMemoryMySQLMetadataStore(MySQLMetadataStore):
             return []
 
         ordered = sorted(self._messages.values(), key=lambda item: int(item["sequence_id"]))
+        if "thread_id" in normalized:
+            channel_id = str(params[0])
+            thread_id = str(params[1])
+            limit = int(params[2])
+            selected = []
+            for row in ordered:
+                if str(row["channel_id"]) != channel_id:
+                    continue
+                payload = json.loads(str(row["payload"]))
+                if payload.get("thread_id") != thread_id:
+                    continue
+                selected.append({"payload": row["payload"]})
+            return selected[:limit]
         if "sequence_id>%s" in normalized:
             channel_id = str(params[0])
             sequence_id = int(params[1])
@@ -302,12 +315,14 @@ def test_mysql_metadata_store_contract_with_in_memory_backend() -> None:
 
     page1 = asyncio.run(store.list_channel_messages("channel-a", cursor=None, limit=2))
     page2 = asyncio.run(store.list_channel_messages("channel-a", cursor=page1[-1]["message_id"], limit=2))
+    thread_page = asyncio.run(store.list_thread_messages("channel-a", "th-1", limit=10))
 
     assert page1 == [
         {"message_id": "msg-1", "channel_id": "channel-a", "content_ref": "content-1"},
         {"message_id": "msg-2", "channel_id": "channel-a", "content_ref": "content-2"},
     ]
     assert page2 == [{"message_id": "msg-3", "channel_id": "channel-a", "content_ref": "content-3"}]
+    assert thread_page == []
     assert asyncio.run(store.get_message(m1["message_id"])) == m1
 
     asyncio.run(

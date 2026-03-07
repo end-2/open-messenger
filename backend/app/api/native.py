@@ -17,9 +17,9 @@ from app.errors import api_error
 from .helpers import (
     authenticate_websocket_token,
     build_file_response,
-    build_message_response,
     format_sse_event,
     get_channel_or_404,
+    hydrate_message_response,
     increment_thread_reply,
     new_id,
     publish_event,
@@ -29,12 +29,17 @@ from .helpers import (
 )
 from .schemas import (
     ChannelResponse,
+    BatchCreateMessagesRequest,
+    BatchCreateMessagesResponse,
+    BatchGetMessagesRequest,
+    BatchGetMessagesResponse,
     CreateChannelRequest,
     CreateMessageRequest,
     CreateThreadRequest,
     FileObjectResponse,
     ListMessagesResponse,
     MessageResponse,
+    ThreadContextResponse,
     ThreadResponse,
 )
 
@@ -270,9 +275,7 @@ async def list_channel_messages(
 
     items: list[dict[str, Any]] = []
     for stored in stored_messages:
-        content_ref = str(stored["content_ref"])
-        content_payload = await content_store.get(content_ref) or {}
-        items.append(build_message_response(stored, content_payload))
+        items.append(await hydrate_message_response(stored, content_store))
 
     next_cursor = None
     if len(stored_messages) == limit:
@@ -282,6 +285,91 @@ async def list_channel_messages(
         "items": items,
         "next_cursor": next_cursor,
     }
+
+
+@router.post("/v1/messages:batchGet", response_model=BatchGetMessagesResponse)
+async def batch_get_messages(
+    payload: BatchGetMessagesRequest,
+    request: Request,
+    _: AuthContext = Depends(require_scopes(["messages:read"])),
+) -> dict[str, Any]:
+    metadata_store = request.app.state.metadata_store
+    content_store = request.app.state.content_store
+
+    items: list[dict[str, Any]] = []
+    not_found_ids: list[str] = []
+    for message_id in payload.message_ids:
+        stored = await metadata_store.get_message(message_id)
+        if stored is None:
+            not_found_ids.append(message_id)
+            continue
+        items.append(await hydrate_message_response(stored, content_store))
+
+    return {
+        "items": items,
+        "not_found_ids": not_found_ids,
+    }
+
+
+@router.post(
+    "/v1/messages:batchCreate",
+    response_model=BatchCreateMessagesResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def batch_create_messages(
+    payload: BatchCreateMessagesRequest,
+    request: Request,
+    _: AuthContext = Depends(require_scopes(["messages:write"])),
+) -> dict[str, Any]:
+    metadata_store = request.app.state.metadata_store
+    content_store = request.app.state.content_store
+
+    items: list[dict[str, Any]] = []
+    for message in payload.items:
+        await get_channel_or_404(metadata_store, message.channel_id)
+
+        if message.thread_id is not None:
+            thread = await metadata_store.get_thread(message.thread_id)
+            if thread is None:
+                raise api_error(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    code="thread_not_found",
+                    message="Thread not found",
+                    retryable=False,
+                )
+            if str(thread.get("channel_id")) != message.channel_id:
+                raise api_error(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    code="thread_channel_mismatch",
+                    message="Thread does not belong to the channel",
+                    retryable=False,
+                )
+
+        message_response, occurred_at, created = await store_message(
+            channel_id=message.channel_id,
+            payload=CreateMessageRequest(**message.model_dump(exclude={"channel_id"})),
+            metadata_store=metadata_store,
+            content_store=content_store,
+        )
+        if message.thread_id is not None and created:
+            await increment_thread_reply(metadata_store, message.thread_id, occurred_at)
+        if created:
+            await publish_event(
+                request,
+                event_type="message.created",
+                occurred_at=occurred_at,
+                data={
+                    "channel_id": message.channel_id,
+                    "thread_id": message_response["thread_id"],
+                    "message_id": message_response["message_id"],
+                    "sender_user_id": message_response["sender_user_id"],
+                    "compat_origin": message_response["compat_origin"],
+                    "attachments": message_response["attachments"],
+                },
+            )
+        items.append(message_response)
+
+    return {"items": items}
 
 
 @router.post(
@@ -336,6 +424,52 @@ async def create_channel_thread(
         },
     )
     return created_thread
+
+
+@router.get("/v1/threads/{thread_id}/context", response_model=ThreadContextResponse)
+async def get_thread_context(
+    thread_id: str,
+    request: Request,
+    limit: int = Query(default=50, ge=1, le=200),
+    _: AuthContext = Depends(require_scopes(["messages:read"])),
+) -> dict[str, Any]:
+    metadata_store = request.app.state.metadata_store
+    content_store = request.app.state.content_store
+
+    thread = await metadata_store.get_thread(thread_id)
+    if thread is None:
+        raise api_error(
+            status_code=status.HTTP_404_NOT_FOUND,
+            code="thread_not_found",
+            message="Thread not found",
+            retryable=False,
+        )
+
+    root_message = await metadata_store.get_message(str(thread["root_message_id"]))
+    if root_message is None:
+        raise api_error(
+            status_code=status.HTTP_404_NOT_FOUND,
+            code="root_message_not_found",
+            message="Root message not found",
+            retryable=False,
+        )
+
+    replies = await metadata_store.list_thread_messages(
+        str(thread["channel_id"]),
+        thread_id,
+        limit + 1,
+    )
+    has_more_replies = len(replies) > limit
+    visible_replies = replies[:limit]
+
+    return {
+        "thread": thread,
+        "root_message": await hydrate_message_response(root_message, content_store),
+        "replies": [
+            await hydrate_message_response(reply, content_store) for reply in visible_replies
+        ],
+        "has_more_replies": has_more_replies,
+    }
 
 
 @router.post(

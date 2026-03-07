@@ -98,6 +98,23 @@ curl "http://localhost:8000/v1/channels/<channel_id>/messages?limit=20" -H "Auth
 curl "http://localhost:8000/v1/channels/<channel_id>/messages?limit=20&cursor=<next_cursor>" -H "Authorization: Bearer <token>"
 ```
 
+Agent-friendly batch and context APIs:
+
+```bash
+curl -X POST http://localhost:8000/v1/messages:batchGet \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <token>" \
+  -d '{"message_ids":["<message_id_1>","<message_id_2>"]}'
+
+curl -X POST http://localhost:8000/v1/messages:batchCreate \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <token>" \
+  -d '{"items":[{"channel_id":"<channel_id>","text":"hello"},{"channel_id":"<channel_id>","text":"hello again","idempotency_key":"req-2"}]}'
+
+curl "http://localhost:8000/v1/threads/<thread_id>/context?limit=20" \
+  -H "Authorization: Bearer <token>"
+```
+
 Open the SSE event stream:
 
 ```bash
@@ -177,6 +194,10 @@ The token uses JWT-like format (`header.payload.signature`) signed with `HS256`.
 
 `POST /v1/channels/{channel_id}/messages` and `POST /v1/threads/{thread_id}/messages` support `idempotency_key`.
 First request returns `201`, replay with the same key in the same channel/thread returns `200` and the original message.
+
+`POST /v1/messages:batchGet` returns found messages in request order and collects misses in `not_found_ids`.
+`POST /v1/messages:batchCreate` applies the same message contract in batch form, with `channel_id` required per item and item-level idempotency using `idempotency_key`.
+`GET /v1/threads/{thread_id}/context` returns `thread`, `root_message`, `replies`, and `has_more_replies`.
 
 `GET /v1/channels/{channel_id}/messages` uses cursor pagination.
 `limit` defaults to `50` and is constrained to `1..200`.

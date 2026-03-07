@@ -86,6 +86,14 @@ class UnsupportedMetadataStore(MetadataStore):
     ) -> list[dict[str, Any]]:
         self._raise_not_supported()
 
+    async def list_thread_messages(
+        self,
+        channel_id: str,
+        thread_id: str,
+        limit: int,
+    ) -> list[dict[str, Any]]:
+        self._raise_not_supported()
+
     async def find_message_by_idempotency(
         self,
         channel_id: str,

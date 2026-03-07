@@ -61,6 +61,34 @@ class ListMessagesResponse(BaseModel):
     next_cursor: Optional[str]
 
 
+class BatchGetMessagesRequest(BaseModel):
+    message_ids: list[str] = Field(min_length=1, max_length=200)
+
+
+class BatchGetMessagesResponse(BaseModel):
+    items: list[MessageResponse]
+    not_found_ids: list[str]
+
+
+class BatchCreateMessageItem(CreateMessageRequest):
+    channel_id: str = Field(min_length=1)
+
+
+class BatchCreateMessagesRequest(BaseModel):
+    items: list[BatchCreateMessageItem] = Field(min_length=1, max_length=100)
+
+
+class BatchCreateMessagesResponse(BaseModel):
+    items: list[MessageResponse]
+
+
+class ThreadContextResponse(BaseModel):
+    thread: ThreadResponse
+    root_message: MessageResponse
+    replies: list[MessageResponse]
+    has_more_replies: bool
+
+
 class CreateUserRequest(BaseModel):
     username: str = Field(min_length=1, max_length=64)
     display_name: Optional[str] = Field(default=None, max_length=100)

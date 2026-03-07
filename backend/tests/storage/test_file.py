@@ -117,6 +117,7 @@ def test_file_metadata_store_persists_and_paginates(tmp_path) -> None:
     page2 = asyncio.run(
         store.list_channel_messages("channel-a", cursor=page1[-1]["message_id"], limit=2)
     )
+    thread_page = asyncio.run(store.list_thread_messages("channel-a", "th-1", limit=10))
 
     assert db_path.exists()
     assert page1 == [
@@ -126,6 +127,7 @@ def test_file_metadata_store_persists_and_paginates(tmp_path) -> None:
     assert page2 == [
         {"message_id": "msg-3", "channel_id": "channel-a", "content_ref": "content-3"}
     ]
+    assert thread_page == []
 
     reloaded_store = FileMetadataStore(db_path)
     assert asyncio.run(reloaded_store.get_user("usr-1")) == user

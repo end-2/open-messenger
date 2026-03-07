@@ -172,6 +172,174 @@ def test_create_message_rejects_missing_attachment() -> None:
     assert response.json()["code"] == "attachment_not_found"
 
 
+def test_batch_get_messages_returns_items_and_not_found_ids() -> None:
+    client = TestClient(create_app())
+    headers = _issue_bearer_headers(client)
+    channel_id = _create_channel(client, headers)
+
+    first = client.post(
+        f"/v1/channels/{channel_id}/messages",
+        json={"text": "first"},
+        headers=headers,
+    )
+    second = client.post(
+        f"/v1/channels/{channel_id}/messages",
+        json={"text": "second"},
+        headers=headers,
+    )
+    assert first.status_code == 201
+    assert second.status_code == 201
+
+    response = client.post(
+        "/v1/messages:batchGet",
+        json={
+            "message_ids": [
+                second.json()["message_id"],
+                "msg_missing",
+                first.json()["message_id"],
+            ]
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert [item["text"] for item in payload["items"]] == ["second", "first"]
+    assert payload["not_found_ids"] == ["msg_missing"]
+
+
+def test_batch_create_messages_supports_idempotency() -> None:
+    client = TestClient(create_app())
+    headers = _issue_bearer_headers(client)
+    channel_id = _create_channel(client, headers)
+
+    first = client.post(
+        "/v1/messages:batchCreate",
+        json={
+            "items": [
+                {
+                    "channel_id": channel_id,
+                    "text": "batch-1",
+                    "idempotency_key": "batch-req-1",
+                },
+                {
+                    "channel_id": channel_id,
+                    "text": "batch-2",
+                    "idempotency_key": "batch-req-2",
+                },
+            ]
+        },
+        headers=headers,
+    )
+    second = client.post(
+        "/v1/messages:batchCreate",
+        json={
+            "items": [
+                {
+                    "channel_id": channel_id,
+                    "text": "batch-1",
+                    "idempotency_key": "batch-req-1",
+                },
+                {
+                    "channel_id": channel_id,
+                    "text": "batch-2",
+                    "idempotency_key": "batch-req-2",
+                },
+            ]
+        },
+        headers=headers,
+    )
+
+    assert first.status_code == 201
+    assert second.status_code == 201
+    assert [item["message_id"] for item in second.json()["items"]] == [
+        item["message_id"] for item in first.json()["items"]
+    ]
+
+    listed = client.get(f"/v1/channels/{channel_id}/messages", headers=headers)
+    assert listed.status_code == 200
+    assert [item["text"] for item in listed.json()["items"]] == ["batch-1", "batch-2"]
+
+
+def test_batch_create_validates_thread_channel_membership() -> None:
+    client = TestClient(create_app())
+    headers = _issue_bearer_headers(client)
+    channel_id = _create_channel(client, headers)
+    other_channel_id = _create_channel(client, headers, name="other-batch")
+
+    root = client.post(
+        f"/v1/channels/{channel_id}/messages",
+        json={"text": "root"},
+        headers=headers,
+    )
+    assert root.status_code == 201
+    thread = client.post(
+        f"/v1/channels/{channel_id}/threads",
+        json={"root_message_id": root.json()["message_id"]},
+        headers=headers,
+    )
+    assert thread.status_code == 201
+
+    response = client.post(
+        "/v1/messages:batchCreate",
+        json={
+            "items": [
+                {
+                    "channel_id": other_channel_id,
+                    "thread_id": thread.json()["thread_id"],
+                    "text": "wrong thread channel",
+                }
+            ]
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 400
+    assert response.json()["code"] == "thread_channel_mismatch"
+
+
+def test_thread_context_returns_root_and_limited_replies() -> None:
+    client = TestClient(create_app())
+    headers = _issue_bearer_headers(client)
+    channel_id = _create_channel(client, headers)
+
+    root = client.post(
+        f"/v1/channels/{channel_id}/messages",
+        json={"text": "root"},
+        headers=headers,
+    )
+    assert root.status_code == 201
+
+    thread = client.post(
+        f"/v1/channels/{channel_id}/threads",
+        json={"root_message_id": root.json()["message_id"]},
+        headers=headers,
+    )
+    assert thread.status_code == 201
+    thread_id = thread.json()["thread_id"]
+
+    for index in range(1, 4):
+        reply = client.post(
+            f"/v1/threads/{thread_id}/messages",
+            json={"text": f"reply-{index}"},
+            headers=headers,
+        )
+        assert reply.status_code == 201
+
+    response = client.get(
+        f"/v1/threads/{thread_id}/context",
+        params={"limit": 2},
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["thread"]["thread_id"] == thread_id
+    assert payload["root_message"]["text"] == "root"
+    assert [item["text"] for item in payload["replies"]] == ["reply-1", "reply-2"]
+    assert payload["has_more_replies"] is True
+
+
 def test_messages_endpoint_returns_404_for_missing_channel() -> None:
     client = TestClient(create_app())
     headers = _issue_bearer_headers(client)

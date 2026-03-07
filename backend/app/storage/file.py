@@ -199,6 +199,24 @@ class FileMetadataStore(MetadataStore):
             records = [deepcopy(database["messages"][msg_id]) for msg_id in selected_ids]
         return records
 
+    async def list_thread_messages(
+        self,
+        channel_id: str,
+        thread_id: str,
+        limit: int,
+    ) -> list[dict[str, Any]]:
+        with self._lock:
+            database = self._read_database()
+            items: list[dict[str, Any]] = []
+            for message_id in database["channel_index"].get(channel_id, []):
+                record = database["messages"][message_id]
+                if record.get("thread_id") != thread_id:
+                    continue
+                items.append(deepcopy(record))
+                if len(items) >= max(limit, 0):
+                    break
+        return items
+
     async def find_message_by_idempotency(
         self,
         channel_id: str,

@@ -115,6 +115,7 @@ def test_in_memory_metadata_store_message_pagination() -> None:
     page2 = asyncio.run(
         store.list_channel_messages("channel-a", cursor=page1[-1]["message_id"], limit=2)
     )
+    thread_page = asyncio.run(store.list_thread_messages("channel-a", "th-1", limit=10))
 
     assert page1 == [
         {"message_id": "msg-1", "channel_id": "channel-a", "content_ref": "content-1"},
@@ -123,6 +124,7 @@ def test_in_memory_metadata_store_message_pagination() -> None:
     assert page2 == [
         {"message_id": "msg-3", "channel_id": "channel-a", "content_ref": "content-3"}
     ]
+    assert thread_page == []
     assert asyncio.run(store.get_message(m1["message_id"])) == m1
 
     asyncio.run(

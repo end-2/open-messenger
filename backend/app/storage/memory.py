@@ -141,6 +141,23 @@ class InMemoryMetadataStore(MetadataStore):
         selected_ids = message_ids[start_idx : start_idx + max(limit, 0)]
         return [deepcopy(self._messages[msg_id]) for msg_id in selected_ids]
 
+    async def list_thread_messages(
+        self,
+        channel_id: str,
+        thread_id: str,
+        limit: int,
+    ) -> list[dict[str, Any]]:
+        selected_ids = self._channel_index.get(channel_id, [])
+        items: list[dict[str, Any]] = []
+        for message_id in selected_ids:
+            record = self._messages[message_id]
+            if record.get("thread_id") != thread_id:
+                continue
+            items.append(deepcopy(record))
+            if len(items) >= max(limit, 0):
+                break
+        return items
+
     async def find_message_by_idempotency(
         self,
         channel_id: str,
