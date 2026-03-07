@@ -22,6 +22,8 @@ test("renderHomePage includes service and user bootstrap sections", () => {
   assert.match(html, /\.preformatted \{/);
   assert.match(html, /function escapeClientHtml\(value\)/);
   assert.match(html, /function enterChatWithToken\(token\)/);
+  assert.match(html, /function validateTokenOrWarn\(accessToken\)/);
+  assert.match(html, /\/api\/session\/validate/);
   assert.match(html, /escapeClientHtml\(formatJson\(payload\.user\)\)/);
   assert.match(html, /escapeClientHtml\(formatJson\(payload\.token\)\)/);
 });
@@ -51,6 +53,8 @@ test("renderChatPage includes dedicated chat workflow sections", () => {
   assert.match(html, /function formatIdentityLabel\(identity\)/);
   assert.match(html, /function decodeCurrentUserId\(\)/);
   assert.match(html, /function toggleThreadSidebar\(isOpen\)/);
+  assert.match(html, /function validateChatAccessOrRedirect\(\)/);
+  assert.match(html, /unvalid token/);
   assert.match(html, /Open chat from the main page after entering a token\./);
   assert.match(html, /sender_display_name/);
   assert.match(html, /items\.filter\(\(item\) => !item\.thread_id\)/);

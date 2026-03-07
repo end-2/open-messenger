@@ -74,6 +74,30 @@ test("BackendClient surfaces structured backend failures", async () => {
   );
 });
 
+test("BackendClient validates access tokens against an authenticated endpoint", async () => {
+  const calls: Array<{ url: string; headers: Headers }> = [];
+  const client = new BackendClient(
+    "http://api.example",
+    "dev-admin-token",
+    async (input, init) => {
+      calls.push({
+        url: String(input),
+        headers: new Headers(init?.headers)
+      });
+      return new Response(": connected\n\n", {
+        status: 200,
+        headers: { "content-type": "text/event-stream" }
+      });
+    }
+  );
+
+  await client.validateAccessToken("token");
+
+  assert.equal(calls.length, 1);
+  assert.match(calls[0].url, /\/v1\/events\/stream$/);
+  assert.equal(calls[0].headers.get("authorization"), "Bearer token");
+});
+
 test("BackendClient supports thread workflows", async () => {
   const calls: Array<{ url: string; body: string | undefined }> = [];
   const fetchStub: typeof fetch = async (input, init) => {

@@ -215,3 +215,42 @@ test("frontend server proxies thread routes", async () => {
     });
   }
 });
+
+test("frontend server validates session tokens", async () => {
+  const server = createFrontendServer(
+    {
+      validateAccessToken: async (accessToken: string) => {
+        assert.equal(accessToken, "token");
+      }
+    },
+    {
+      home: "<html><body>home</body></html>",
+      chat: "<html><body>chat</body></html>"
+    }
+  );
+
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+
+  try {
+    const address = server.address();
+    assert(address && typeof address === "object");
+    const response = await fetch(`http://127.0.0.1:${address.port}/api/session/validate`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ accessToken: "token" })
+    });
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { valid: true });
+  } finally {
+    await new Promise<void>((resolve, reject) => {
+      server.close((error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve();
+      });
+    });
+  }
+});

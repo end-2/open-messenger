@@ -59,6 +59,13 @@ export function createFrontendServer(client: BackendClient, pages: { home: strin
         return;
       }
 
+      if (request.method === "POST" && url.pathname === "/api/session/validate") {
+        const body = await readJson(request);
+        await client.validateAccessToken(String(body.accessToken ?? ""));
+        sendJson(response, 200, { valid: true });
+        return;
+      }
+
       if (request.method === "POST" && url.pathname === "/api/bootstrap") {
         const body = await readJson(request);
         const result = await client.bootstrapUser({

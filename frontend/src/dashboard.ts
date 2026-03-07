@@ -595,10 +595,28 @@ export function renderHomePage(config: FrontendConfig): string {
           return null;
         }
       }
-      function enterChatWithToken(token) {
+      async function validateTokenOrWarn(accessToken) {
+        const response = await fetch("/api/session/validate", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ accessToken })
+        });
+
+        if (!response.ok) {
+          window.alert("unvalid token");
+          setStatus(chatEntryStatus, "Token validation failed.");
+          return false;
+        }
+
+        return true;
+      }
+      async function enterChatWithToken(token) {
         const accessToken = String(token || "").trim();
         if (!accessToken) {
           setStatus(chatEntryStatus, "Enter a token on this page before opening chat.");
+          return;
+        }
+        if (!(await validateTokenOrWarn(accessToken))) {
           return;
         }
         const identity = readStoredIdentity();
@@ -633,11 +651,11 @@ export function renderHomePage(config: FrontendConfig): string {
 
       chatLinkWithToken.addEventListener("click", () => {
         const identity = readStoredIdentity();
-        enterChatWithToken(typeof identity?.token?.token === "string" ? identity.token.token : "");
+        void enterChatWithToken(typeof identity?.token?.token === "string" ? identity.token.token : "");
       });
       chatEntryForm.addEventListener("submit", (event) => {
         event.preventDefault();
-        enterChatWithToken(chatEntryToken.value);
+        void enterChatWithToken(chatEntryToken.value);
       });
 
       bootstrapForm.addEventListener("submit", async (event) => {
@@ -1095,6 +1113,24 @@ export function renderChatPage(): string {
           setStatus(sessionStatus, "Open chat from the main page after entering a token.");
         }
       }
+      async function validateChatAccessOrRedirect() {
+        if (!accessToken) {
+          window.alert("unvalid token");
+          window.location.href = "/";
+          return false;
+        }
+        const response = await fetch("/api/session/validate", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ accessToken })
+        });
+        if (!response.ok) {
+          window.alert("unvalid token");
+          window.location.href = "/";
+          return false;
+        }
+        return true;
+      }
       channelForm.addEventListener("submit", async (event) => {
         event.preventDefault();
         const form = new FormData(channelForm);
@@ -1236,15 +1272,22 @@ export function renderChatPage(): string {
         }
         setStatus(streamStatus, "Event stream stopped.", true);
       });
-      restoreSession();
-      renderChannelList();
-      renderThreadPanel();
-      toggleThreadSidebar(false);
-      const channels = readStoredChannels();
-      if (channels.length > 0) {
-        setActiveChannel(channels[0]);
-        void loadMessages();
+      async function initializeChatPage() {
+        restoreSession();
+        if (!(await validateChatAccessOrRedirect())) {
+          return;
+        }
+        renderChannelList();
+        renderThreadPanel();
+        toggleThreadSidebar(false);
+        const channels = readStoredChannels();
+        if (channels.length > 0) {
+          setActiveChannel(channels[0]);
+          await loadMessages();
+        }
       }
+
+      void initializeChatPage();
     </script>`
   );
 }

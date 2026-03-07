@@ -98,6 +98,31 @@ export class BackendClient {
     });
   }
 
+  async validateAccessToken(accessToken: string): Promise<void> {
+    const response = await this.fetchImpl(`${this.baseUrl}/v1/events/stream`, {
+      method: "GET",
+      headers: {
+        authorization: `Bearer ${accessToken}`
+      }
+    });
+
+    if (!response.ok) {
+      let details: unknown = null;
+      try {
+        details = await response.json();
+      } catch {
+        details = await response.text();
+      }
+      throw new BackendError(`Backend request failed with status ${response.status}`, response.status, details);
+    }
+
+    try {
+      await response.body?.cancel();
+    } catch {
+      // Ignore stream shutdown errors after the auth check succeeds.
+    }
+  }
+
   async bootstrapUser(input: {
     username: string;
     displayName?: string;
