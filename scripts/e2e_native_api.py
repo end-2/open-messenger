@@ -8,10 +8,21 @@ import os
 import re
 import sys
 import time
+from pathlib import Path
 from typing import Any
 
 import httpx
 from websockets.sync.client import connect as websocket_connect
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from scripts.e2e_storage_assertions import (
+    NativeApiStorageArtifacts,
+    load_storage_verification_config,
+    verify_native_api_storage,
+)
 
 ULID_RE = re.compile(r"^[a-z][a-z0-9]*_[0-9A-HJKMNP-TV-Z]{26}$")
 
@@ -76,7 +87,7 @@ def _recv_event_by_type(
     raise AssertionError(f"Did not receive expected WebSocket event type: {expected_type}")
 
 
-def run(base_url: str, admin_token: str) -> None:
+def run(base_url: str, admin_token: str) -> NativeApiStorageArtifacts:
     default_scopes = [
         "channels:read",
         "channels:write",
@@ -368,6 +379,19 @@ def run(base_url: str, admin_token: str) -> None:
         _expect(set(missing_file.keys()) == {"code", "message", "retryable"}, "Invalid error schema")
         _expect(missing_file["code"] == "file_not_found", "Unexpected error code for missing file")
 
+        return NativeApiStorageArtifacts(
+            user_id=user_id,
+            channel_id=channel_id,
+            thread_id=thread_id,
+            root_message_id=first_message["message_id"],
+            root_content_ref=first_message["content_ref"],
+            reply_message_id=first_reply["message_id"],
+            reply_content_ref=first_reply["content_ref"],
+            file_id=file_id,
+            root_idempotency_key=str(message_payload["idempotency_key"]),
+            reply_idempotency_key=str(reply_payload["idempotency_key"]),
+        )
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run Open Messenger Native API E2E checks.")
@@ -384,7 +408,10 @@ def main() -> int:
     args = parser.parse_args()
 
     try:
-        run(base_url=args.base_url, admin_token=args.admin_token)
+        artifacts = run(base_url=args.base_url, admin_token=args.admin_token)
+        verification_config = load_storage_verification_config()
+        if verification_config is not None:
+            verify_native_api_storage(verification_config, artifacts)
     except Exception as exc:  # noqa: BLE001
         print(f"E2E failed: {exc}", file=sys.stderr)
         return 1

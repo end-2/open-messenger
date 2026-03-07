@@ -158,7 +158,7 @@ Docker:
 - `make test-frontend-cli-golang-docker`
 - `make e2e-docker`
 
-`make e2e` and `make e2e-docker` both run the full native API end-to-end suite, including the multi-user scenario.
+`make e2e` and `make e2e-docker` both run the full native API end-to-end suite, including the multi-user scenario. The Docker E2E run also verifies that the native API scenario persisted the expected message content in Redis and the related metadata rows in MySQL.
 
 ## Make Targets
 

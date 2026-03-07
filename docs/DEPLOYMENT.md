@@ -14,6 +14,7 @@ Local Python environment:
 2. Run backend unit tests with `make test`.
 3. Run the backend server with `make run`.
 4. Run all end-to-end checks, including the multi-user scenario, with `make e2e`.
+   The local E2E target validates API behavior only unless you provide the optional storage verification environment variables.
 
 Frontend workflows:
 
@@ -45,6 +46,7 @@ Development and verification commands:
 2. Start the application stack with `make fullstack-up`.
 3. Run backend unit tests in Docker with `make test-docker`.
 4. Run all backend E2E checks, including the multi-user scenario, in Docker with `make e2e-docker`.
+   The Docker E2E service also inspects Redis and MySQL directly to confirm that the native API scenario persisted the expected content and metadata records.
 6. Run frontend unit tests in Docker with `make test-frontend-docker`.
 7. Run frontend CLI unit tests in Docker with `make test-frontend-cli-docker`.
 8. Stop the deployment test stack with `make down`.
