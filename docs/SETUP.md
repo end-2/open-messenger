@@ -37,15 +37,20 @@ Optional: tighten or disable rate limiting during local runs:
 1. Start deployment test stack:
    - `make up`
    - This starts API, Redis, MySQL, Prometheus, Loki, Promtail, Tempo, and Grafana.
-2. Run backend unit tests in a container:
+2. Start the full-stack application containers:
+   - `make fullstack-up`
+   - This starts the frontend console, API, Redis, MySQL, and Tempo.
+3. Run backend unit tests in a container:
    - `make test-docker`
-3. Run backend end-to-end API checks in a container:
+4. Run backend end-to-end API checks in a container:
    - `make e2e-docker`
-4. Run frontend unit tests in a container:
+5. Run frontend unit tests in a container:
    - `make test-frontend-docker`
-5. Stop the stack:
+6. Stop the deployment test stack:
    - `make down`
-6. Render deploy-ready Compose configs from the maintained templates:
+7. Stop the full-stack application containers:
+   - `make fullstack-down`
+8. Render deploy-ready Compose configs from the maintained templates:
    - `make deploy-single-config`
    - `make deploy-staging-config`
    - `make deploy-prod-config`
@@ -89,5 +94,10 @@ Monitoring endpoints after `make up`:
 - Loki: `http://localhost:3100`
 - Tempo: `http://localhost:3200`
 - Grafana: `http://localhost:3000` (`admin` / `admin`)
+
+Application endpoints after `make fullstack-up`:
+
+- Frontend: `http://localhost:3001`
+- API: `http://localhost:8000`
 
 Deployment profiles, environment templates, and rollback/runbook instructions are maintained in `docs/DEPLOY.md`.

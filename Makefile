@@ -5,7 +5,7 @@ PIP := $(VENV_DIR)/bin/pip
 PYTEST := $(VENV_DIR)/bin/pytest
 UVICORN := $(VENV_DIR)/bin/uvicorn
 
-.PHONY: help venv install run test e2e test-docker e2e-docker test-frontend-docker up down deploy-single-config deploy-staging-config deploy-prod-config clean
+.PHONY: help venv install run test e2e test-docker e2e-docker test-frontend-docker up down fullstack-up fullstack-down deploy-single-config deploy-staging-config deploy-prod-config clean
 
 help:
 	@echo "Available targets:"
@@ -19,6 +19,8 @@ help:
 	@echo "  test-frontend-docker  Run frontend unit test in Docker"
 	@echo "  up           Start deployment test stack (API, Redis, MySQL, Prometheus, Loki, Tempo, Grafana)"
 	@echo "  down         Stop and remove deployment test stack"
+	@echo "  fullstack-up Start frontend and backend application containers in Docker"
+	@echo "  fullstack-down Stop and remove fullstack application containers"
 	@echo "  deploy-single-config  Render single-instance deployment compose config"
 	@echo "  deploy-staging-config Render staging deployment compose config"
 	@echo "  deploy-prod-config    Render production deployment compose config"
@@ -63,6 +65,13 @@ up:
 
 down:
 	docker compose down --volumes --remove-orphans
+
+fullstack-up:
+	docker compose up --build -d frontend api redis mysql tempo
+
+fullstack-down:
+	docker compose stop frontend api redis mysql tempo
+	docker compose rm -f frontend api redis mysql tempo
 
 deploy-single-config:
 	docker compose --env-file ops/deploy/env/dev.env.example -f ops/deploy/docker-compose.single-instance.yml config

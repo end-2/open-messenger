@@ -8,6 +8,7 @@ This document turns the current runtime settings into deployable profiles and in
 
 - Intended for one-node deployments and low operational overhead.
 - Storage combination: `file + file`
+- Application services included: `frontend`, `api`
 - Monitoring included: Prometheus, Loki, Promtail, Tempo, Grafana
 - Compose file: `ops/deploy/docker-compose.single-instance.yml`
 - Recommended environment template: `ops/deploy/env/staging.env.example`
@@ -16,6 +17,7 @@ This document turns the current runtime settings into deployable profiles and in
 
 - Intended for horizontally scalable API nodes with shared metadata and content services.
 - Storage combination: `redis + mysql`
+- Application services included: `frontend`, `api`
 - Monitoring included: Prometheus, Loki, Promtail, Tempo, Grafana
 - Compose file: `ops/deploy/docker-compose.prod.yml`
 - Recommended environment template: `ops/deploy/env/prod.env.example`
@@ -30,6 +32,7 @@ Maintained templates:
 
 Each template includes:
 
+- frontend port and backend base URL for the browser console
 - storage backend selection
 - file storage locations
 - Redis and MySQL connection settings
@@ -66,6 +69,7 @@ docker compose \
 
 Services started:
 
+- `frontend`
 - `api`
 - `prometheus`
 - `loki`
@@ -86,6 +90,7 @@ docker compose \
 
 Services started:
 
+- `frontend`
 - `api`
 - `redis`
 - `mysql`
@@ -99,6 +104,7 @@ Services started:
 
 When the monitoring stack is enabled:
 
+- Frontend: `http://localhost:3001`
 - API: `http://localhost:8000`
 - Prometheus: `http://localhost:9090`
 - Loki: `http://localhost:3100`
@@ -117,14 +123,16 @@ Replace these values before staging or production rollout.
 1. Record the current image digest and the target image digest before rollout.
 2. Run `docker compose ... config` against the chosen deployment bundle to catch configuration drift.
 3. Deploy the new image and wait for `http://<host>:8000/readyz` to return `200`.
-4. If readiness, error-rate, or latency checks regress, redeploy the previous image digest with the same env file.
-5. Confirm recovery through `/readyz`, Prometheus request/error metrics, and recent Loki logs.
-6. Preserve the failed image reference, logs, and env diff for incident follow-up.
+4. Wait for `http://<host>:3001/healthz` to return `200` for the frontend service.
+5. If readiness, error-rate, or latency checks regress, redeploy the previous image digest with the same env file.
+6. Confirm recovery through `/readyz`, frontend `/healthz`, Prometheus request/error metrics, and recent Loki logs.
+7. Preserve the failed image reference, logs, and env diff for incident follow-up.
 
 ## Operations Runbook
 
 Startup checks:
 
+- `curl http://localhost:3001/healthz`
 - `curl http://localhost:8000/healthz`
 - `curl http://localhost:8000/readyz`
 - `curl http://localhost:8000/metrics`

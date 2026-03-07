@@ -25,6 +25,22 @@ Environment variables:
 
 Open `http://127.0.0.1:3001` after the backend API is available.
 
+## Docker
+
+From the repository root:
+
+```bash
+make fullstack-up
+```
+
+This starts the frontend container on `http://127.0.0.1:3001` and points it at the Dockerized backend API on `http://api:8000`.
+
+Stop it with:
+
+```bash
+make fullstack-down
+```
+
 ## Test
 
 ```bash

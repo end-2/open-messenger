@@ -1,4 +1,30 @@
 services:
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: open-messenger-frontend
+    environment:
+      FRONTEND_PORT: 3001
+      OPEN_MESSENGER_API_BASE_URL: http://api:8000
+      OPEN_MESSENGER_ADMIN_API_TOKEN: dev-admin-token
+    ports:
+      - "3001:3001"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3001/healthz').then((response)=>{if(!response.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
   api:
     build:
       context: .
@@ -69,6 +95,8 @@ services:
       - ./ops/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     depends_on:
       api:
+        condition: service_healthy
+      frontend:
         condition: service_healthy
 
   loki:

@@ -65,10 +65,22 @@ Start deployment test stack (API + Redis + MySQL + Prometheus + Loki + Tempo + G
 make up
 ```
 
+Start the frontend plus backend application stack in Docker:
+
+```bash
+make fullstack-up
+```
+
 Stop stack:
 
 ```bash
 make down
+```
+
+Stop the frontend plus backend application stack:
+
+```bash
+make fullstack-down
 ```
 
 Run unit tests inside Docker for reproducibility:
@@ -88,6 +100,11 @@ Run frontend unit tests in Docker:
 ```bash
 make test-frontend-docker
 ```
+
+After `make fullstack-up`, open:
+
+- Frontend: `http://localhost:3001`
+- API: `http://localhost:8000`
 
 Render deployment configs:
 

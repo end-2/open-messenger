@@ -1,4 +1,5 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { pathToFileURL } from "node:url";
 
 import { BackendClient, BackendError } from "./backend.ts";
 import { getFrontendConfig } from "./config.ts";
@@ -38,6 +39,11 @@ export function createFrontendServer(client: BackendClient, html: string) {
     const url = new URL(request.url, "http://localhost");
 
     try {
+      if (request.method === "GET" && url.pathname === "/healthz") {
+        sendJson(response, 200, { status: "ok" });
+        return;
+      }
+
       if (request.method === "GET" && url.pathname === "/") {
         send(response, 200, html, "text/html; charset=utf-8");
         return;
@@ -136,11 +142,10 @@ export function createFrontendServer(client: BackendClient, html: string) {
   });
 }
 
-const config = getFrontendConfig();
-const client = new BackendClient(config.apiBaseUrl, config.adminToken);
-const server = createFrontendServer(client, renderDashboard(config));
-
-if (process.env.NODE_ENV !== "test") {
+export function startFrontendServer() {
+  const config = getFrontendConfig();
+  const client = new BackendClient(config.apiBaseUrl, config.adminToken);
+  const server = createFrontendServer(client, renderDashboard(config));
   server.listen(config.port, () => {
     console.log(
       JSON.stringify({
@@ -151,4 +156,12 @@ if (process.env.NODE_ENV !== "test") {
       })
     );
   });
+  return server;
+}
+
+const isMainModule =
+  process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (isMainModule) {
+  startFrontendServer();
 }
