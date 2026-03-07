@@ -609,7 +609,7 @@ export function renderHomePage(config: FrontendConfig): string {
     "home-body",
     `    <main class="shell">
       <section class="hero">
-        <span class="eyebrow">Open Messenger Frontend</span>
+        <span class="eyebrow">Open Messenger</span>
         <h1>Prepare the workspace, then enter the chat console.</h1>
         <p>
           Start here to inspect the service and mint a user token. Channel management and the message

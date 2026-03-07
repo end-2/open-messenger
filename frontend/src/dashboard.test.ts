@@ -10,7 +10,7 @@ test("renderHomePage includes service and user bootstrap sections", () => {
     adminToken: "dev-admin-token"
   });
 
-  assert.match(html, /Open Messenger Frontend/);
+  assert.match(html, /Open Messenger/);
   assert.match(html, /Service Snapshot/);
   assert.match(html, /User Creation/);
   assert.doesNotMatch(html, /Channels and Messages/);
