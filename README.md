@@ -26,6 +26,7 @@ Run local unit tests:
 
 ```bash
 make test
+cd frontend && npm test
 ```
 
 Run end-to-end checks locally:
@@ -44,6 +45,7 @@ Run tests in Docker:
 
 ```bash
 make test-docker
+make test-frontend-docker
 make e2e-docker
 ```
 

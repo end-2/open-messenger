@@ -15,6 +15,8 @@ test("renderHomePage includes service and user bootstrap sections", () => {
   assert.match(html, /User Creation/);
   assert.doesNotMatch(html, /Channels and Messages/);
   assert.match(html, /http:\/\/127\.0\.0\.1:8000/);
+  assert.match(html, /class="card-list identity-output"/);
+  assert.match(html, /\.preformatted \{/);
 });
 
 test("renderChatPage includes dedicated chat workflow sections", () => {
@@ -24,4 +26,8 @@ test("renderChatPage includes dedicated chat workflow sections", () => {
   assert.match(html, /Create Channel/);
   assert.match(html, /Live Event Stream/);
   assert.match(html, /Active Room/);
+  assert.match(html, /class="chat-layout viewport-panel"/);
+  assert.match(html, /class="scroll-region" id="message-list"/);
+  assert.match(html, /class="feed scroll-region" id="event-feed"/);
+  assert.match(html, /class="break-anywhere" name="accessToken"/);
 });

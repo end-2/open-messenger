@@ -32,18 +32,22 @@ function renderBasePage(title: string, bodyClass: string, content: string): stri
         --radius: 24px;
       }
       * { box-sizing: border-box; }
+      html { height: 100%; }
       body {
         margin: 0;
         font-family: Georgia, "Times New Roman", serif;
         color: var(--text);
         background: var(--bg);
-        min-height: 100vh;
+        min-height: 100dvh;
       }
       a { color: inherit; }
       .shell {
         max-width: 1320px;
         margin: 0 auto;
         padding: 32px 20px 48px;
+      }
+      .shell > * {
+        min-width: 0;
       }
       .hero {
         display: grid;
@@ -73,6 +77,7 @@ function renderBasePage(title: string, bodyClass: string, content: string): stri
         box-shadow: var(--shadow);
         border-radius: var(--radius);
         padding: 20px;
+        min-width: 0;
       }
       .stack { display: grid; gap: 16px; }
       .row { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -83,6 +88,7 @@ function renderBasePage(title: string, bodyClass: string, content: string): stri
         border: 1px solid rgba(54, 71, 91, 0.16);
         padding: 12px 14px;
         font: inherit;
+        min-width: 0;
       }
       textarea { min-height: 120px; resize: vertical; }
       button {
@@ -119,6 +125,15 @@ function renderBasePage(title: string, bodyClass: string, content: string): stri
         font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
         font-size: 0.88rem;
       }
+      .break-anywhere {
+        overflow-wrap: anywhere;
+        word-break: break-word;
+      }
+      .preformatted {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+      }
       .status {
         min-height: 24px;
         color: var(--muted);
@@ -153,12 +168,70 @@ function renderBasePage(title: string, bodyClass: string, content: string): stri
         background: rgba(255,255,255,0.62);
         color: var(--text);
       }
+      .home-grid,
+      .chat-layout {
+        display: grid;
+        gap: 18px;
+        min-width: 0;
+      }
+      .home-grid {
+        grid-template-columns: 1.02fr 0.98fr;
+        align-items: start;
+      }
+      .identity-output {
+        overflow: auto;
+        max-height: min(32rem, 42dvh);
+      }
+      .viewport-panel {
+        height: clamp(32rem, calc(100dvh - 18rem), 52rem);
+        min-height: 0;
+      }
+      .sidebar-panel,
+      .stream-panel,
+      .chat-panel {
+        min-height: 0;
+        overflow: hidden;
+      }
+      .sidebar-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .chat-panel {
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr) auto;
+        gap: 16px;
+      }
+      .stream-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .scroll-region {
+        min-height: 0;
+        overflow: auto;
+        padding-right: 4px;
+      }
+      .channel-list {
+        min-height: 0;
+        overflow: auto;
+      }
+      .chat-layout {
+        grid-template-columns: 320px minmax(0, 1fr) 320px;
+        align-items: stretch;
+      }
       body.chat-body .shell {
         max-width: 1440px;
         padding-bottom: 24px;
       }
+      body.chat-body main.shell {
+        min-height: 100dvh;
+      }
       @media (max-width: 980px) {
-        .row, .metrics { grid-template-columns: 1fr; }
+        .row, .metrics, .home-grid, .chat-layout, .hero { grid-template-columns: 1fr; }
+        .chat-layout {
+          grid-auto-rows: minmax(18rem, 1fr);
+        }
       }
     </style>
   </head>
@@ -183,7 +256,7 @@ export function renderHomePage(config: FrontendConfig): string {
           experience now live in a dedicated chat page with a room-style layout.
         </p>
       </section>
-      <section style="display:grid; grid-template-columns: 1.02fr 0.98fr; gap: 18px;">
+      <section class="home-grid">
         <div class="stack">
           <article class="panel">
             <h2>Service Snapshot</h2>
@@ -208,7 +281,7 @@ export function renderHomePage(config: FrontendConfig): string {
           </article>
         </div>
         <div class="stack">
-          <article class="panel">
+          <article class="panel viewport-panel">
             <h2>User Creation</h2>
             <form class="stack" id="bootstrap-form">
               <div class="row">
@@ -237,7 +310,7 @@ export function renderHomePage(config: FrontendConfig): string {
               </div>
             </form>
             <div class="status" id="bootstrap-status"></div>
-            <ul class="card-list" id="identity-list"></ul>
+            <ul class="card-list identity-output" id="identity-list"></ul>
           </article>
         </div>
       </section>
@@ -329,8 +402,8 @@ export function renderHomePage(config: FrontendConfig): string {
           saveIdentity(payload);
           setStatus(bootstrapStatus, "User and token created. The token is saved for the chat page.", true);
           identityList.innerHTML = [
-            "<li><strong>User</strong><pre class=\\"mono\\">" + formatJson(payload.user) + "</pre></li>",
-            "<li><strong>Token</strong><pre class=\\"mono\\">" + formatJson(payload.token) + "</pre></li>"
+            "<li><strong>User</strong><pre class=\\"mono preformatted\\">" + formatJson(payload.user) + "</pre></li>",
+            "<li><strong>Token</strong><pre class=\\"mono preformatted\\">" + formatJson(payload.token) + "</pre></li>"
           ].join("");
         } catch (error) {
           setStatus(bootstrapStatus, error instanceof Error ? error.message : "Unknown error");
@@ -360,14 +433,14 @@ export function renderChatPage(): string {
           <a class="button-link ghost" href="/">Back to service setup</a>
         </div>
       </section>
-      <section style="display:grid; grid-template-columns: 320px minmax(0, 1fr) 320px; gap: 18px;">
-        <aside class="panel stack">
+      <section class="chat-layout viewport-panel">
+        <aside class="panel sidebar-panel">
           <div>
             <h2>Session</h2>
             <p class="hint">Use the token from the first page or paste another Native API token.</p>
           </div>
           <label>Access token
-            <input name="accessToken" id="access-token-input" placeholder="Paste access token" required />
+            <input class="break-anywhere" name="accessToken" id="access-token-input" placeholder="Paste access token" required />
           </label>
           <div class="row">
             <button type="button" id="save-session">Save token</button>
@@ -385,21 +458,21 @@ export function renderChatPage(): string {
             </form>
             <div class="status" id="channel-status"></div>
           </div>
-          <div>
+          <div class="stack" style="min-height:0;">
             <div style="display:flex; justify-content:space-between; gap:12px; align-items:center;">
               <h2 style="margin-bottom:0;">Rooms</h2>
               <button type="button" class="ghost" id="refresh-messages">Refresh room</button>
             </div>
             <p class="hint">Created rooms are kept in local storage for quick re-entry.</p>
-            <ul class="card-list" id="channel-list"></ul>
+            <ul class="card-list channel-list" id="channel-list"></ul>
           </div>
         </aside>
-        <section class="panel" style="display:grid; grid-template-rows:auto 1fr auto; min-height: 70vh; gap:16px;">
+        <section class="panel chat-panel">
           <header style="display:flex; justify-content:space-between; gap:12px; align-items:flex-start; border-bottom:1px solid var(--border); padding-bottom:16px;">
             <div>
               <p class="eyebrow" style="margin-bottom:6px;">Active Room</p>
               <h2 id="active-channel-name" style="margin-bottom:4px;">Select a channel</h2>
-              <p class="mono hint" id="active-channel-id">No channel selected.</p>
+              <p class="mono hint break-anywhere" id="active-channel-id">No channel selected.</p>
             </div>
             <div style="min-width: 220px;">
               <label>Sender user ID
@@ -407,7 +480,7 @@ export function renderChatPage(): string {
               </label>
             </div>
           </header>
-          <div id="message-list" style="display:grid; gap:12px; align-content:start; overflow:auto; padding-right:4px;"></div>
+          <div class="scroll-region" id="message-list" style="display:grid; gap:12px; align-content:start;"></div>
           <form class="stack" id="message-form" style="border-top:1px solid var(--border); padding-top:16px;">
             <input type="hidden" name="channelId" id="channel-id-input" />
             <label>Message
@@ -424,7 +497,7 @@ export function renderChatPage(): string {
             <div class="status" id="message-status"></div>
           </form>
         </section>
-        <aside class="panel stack">
+        <aside class="panel stream-panel">
           <div>
             <h2>Live Event Stream</h2>
             <p class="hint">The browser connects through the frontend SSE proxy.</p>
@@ -434,7 +507,7 @@ export function renderChatPage(): string {
             <button type="button" class="ghost" id="stop-stream">Stop stream</button>
           </div>
           <div class="status" id="stream-status"></div>
-          <ul class="feed" id="event-feed"></ul>
+          <ul class="feed scroll-region" id="event-feed"></ul>
         </aside>
       </section>
     </main>
@@ -565,8 +638,8 @@ export function renderChatPage(): string {
             "<strong>" + (item.sender_user_id || "unknown sender") + "</strong>",
             "<time class=\\"hint\\">" + formatTimestamp(item.created_at) + "</time>",
             "</div>",
-            "<p style=\\"white-space:pre-wrap; color:var(--text); margin:12px 0 10px;\\">" + item.text.replaceAll("<", "&lt;").replaceAll(">", "&gt;") + "</p>",
-            "<div class=\\"mono hint\\">" + item.message_id + "</div>"
+            "<p class=\\"preformatted\\" style=\\"color:var(--text); margin:12px 0 10px;\\">" + item.text.replaceAll("<", "&lt;").replaceAll(">", "&gt;") + "</p>",
+            "<div class=\\"mono hint break-anywhere\\">" + item.message_id + "</div>"
           ].join("");
           messageList.appendChild(bubble);
         }
@@ -750,7 +823,7 @@ export function renderChatPage(): string {
 
         eventSource.onmessage = (event) => {
           const item = document.createElement("li");
-          item.innerHTML = "<time>" + new Date().toLocaleTimeString() + "</time><pre class=\\"mono\\" style=\\"white-space:pre-wrap; margin:8px 0 0;\\">" + event.data.replaceAll("<", "&lt;").replaceAll(">", "&gt;") + "</pre>";
+          item.innerHTML = "<time>" + new Date().toLocaleTimeString() + "</time><pre class=\\"mono preformatted\\" style=\\"margin:8px 0 0;\\">" + event.data.replaceAll("<", "&lt;").replaceAll(">", "&gt;") + "</pre>";
           eventFeed.prepend(item);
         };
 
