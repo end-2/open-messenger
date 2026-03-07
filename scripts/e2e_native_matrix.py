@@ -3,9 +3,14 @@ from __future__ import annotations
 
 import argparse
 import os
+from pathlib import Path
 import sys
 
-from app.e2e_matrix import run_matrix_scenario
+REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from scripts.e2e_matrix_lib import run_matrix_scenario
 
 
 def main() -> int:

@@ -1,8 +1,15 @@
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
 import pytest
 
-from app.e2e_matrix import (
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from scripts.e2e_matrix_lib import (
     EXPECTED_CHANNEL_TRANSCRIPTS,
     assert_matches,
     canonicalize_batch_get,
