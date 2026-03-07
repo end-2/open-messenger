@@ -225,10 +225,19 @@ function renderBasePage(title: string, bodyClass: string, content: string): stri
       }
       .home-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-areas:
+          "summary ."
+          "workspace user";
         align-items: start;
       }
-      .home-summary {
-        margin-bottom: 18px;
+      .home-grid-summary {
+        grid-area: summary;
+      }
+      .home-grid-workspace {
+        grid-area: workspace;
+      }
+      .home-grid-user {
+        grid-area: user;
       }
       .identity-output {
         overflow: auto;
@@ -523,8 +532,8 @@ export function renderHomePage(config: FrontendConfig): string {
           experience now live in a dedicated chat page with a room-style layout.
         </p>
       </section>
-      <section class="home-summary">
-        <article class="panel">
+      <section class="home-grid">
+        <article class="panel home-grid-summary">
           <h2>Service Snapshot</h2>
           <div class="metrics" id="service-metrics">
             <div class="metric"><strong id="service-name">...</strong><span>service</span></div>
@@ -533,9 +542,7 @@ export function renderHomePage(config: FrontendConfig): string {
           </div>
           <p class="mono hint" id="service-details">Connecting to ${apiBaseUrl}</p>
         </article>
-      </section>
-      <section class="home-grid">
-        <article class="panel viewport-panel">
+        <article class="panel viewport-panel home-grid-workspace">
           <h2>Open Chat Workspace</h2>
           <p>
             Move to the dedicated chat page to create channels, load room history, send messages,
@@ -553,7 +560,7 @@ export function renderHomePage(config: FrontendConfig): string {
           <div class="status" id="chat-entry-status"></div>
           <p class="hint">If you bootstrap a user here, the returned token is stored locally and can be reused when entering the chat page.</p>
         </article>
-        <article class="panel viewport-panel">
+        <article class="panel viewport-panel home-grid-user">
           <h2>User Creation</h2>
           <form class="stack" id="bootstrap-form">
             <div class="row">
