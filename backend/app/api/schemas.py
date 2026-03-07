@@ -52,6 +52,8 @@ class MessageResponse(BaseModel):
     channel_id: str
     thread_id: Optional[str]
     sender_user_id: str
+    sender_username: Optional[str]
+    sender_display_name: Optional[str]
     content_ref: str
     text: str
     attachments: list[str]

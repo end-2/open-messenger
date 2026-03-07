@@ -1041,6 +1041,16 @@ components:
         sender_user_id:
           type: string
           title: Sender User Id
+        sender_username:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Sender Username
+        sender_display_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Sender Display Name
         content_ref:
           type: string
           title: Content Ref
@@ -1081,6 +1091,8 @@ components:
       - channel_id
       - thread_id
       - sender_user_id
+      - sender_username
+      - sender_display_name
       - content_ref
       - text
       - attachments

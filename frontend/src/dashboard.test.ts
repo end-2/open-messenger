@@ -38,5 +38,7 @@ test("renderChatPage includes dedicated chat workflow sections", () => {
   assert.match(html, /class="break-anywhere" name="accessToken"/);
   assert.doesNotMatch(html, /Sender user ID/);
   assert.match(html, /function escapeClientHtml\(value\)/);
+  assert.match(html, /function formatSenderLabel\(message\)/);
+  assert.match(html, /sender_display_name/);
   assert.match(html, /escapeClientHtml\(event\.data\)/);
 });

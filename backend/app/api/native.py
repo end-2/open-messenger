@@ -314,7 +314,7 @@ async def list_channel_messages(
 
     items: list[dict[str, Any]] = []
     for stored in stored_messages:
-        items.append(await hydrate_message_response(stored, content_store))
+        items.append(await hydrate_message_response(stored, metadata_store, content_store))
 
     next_cursor = None
     if len(stored_messages) == limit:
@@ -342,7 +342,7 @@ async def batch_get_messages(
         if stored is None:
             not_found_ids.append(message_id)
             continue
-        items.append(await hydrate_message_response(stored, content_store))
+        items.append(await hydrate_message_response(stored, metadata_store, content_store))
 
     return {
         "items": items,
@@ -514,9 +514,10 @@ async def get_thread_context(
 
     return {
         "thread": thread,
-        "root_message": await hydrate_message_response(root_message, content_store),
+        "root_message": await hydrate_message_response(root_message, metadata_store, content_store),
         "replies": [
-            await hydrate_message_response(reply, content_store) for reply in visible_replies
+            await hydrate_message_response(reply, metadata_store, content_store)
+            for reply in visible_replies
         ],
         "has_more_replies": has_more_replies,
     }

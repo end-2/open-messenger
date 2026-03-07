@@ -629,6 +629,9 @@ export function renderChatPage(): string {
           return value;
         }
       }
+      function formatSenderLabel(message) {
+        return message?.sender_display_name || message?.sender_username || message?.sender_user_id || "unknown sender";
+      }
       ${renderClientEscapeHelper()}
       function readStoredIdentity() {
         try {
@@ -705,7 +708,7 @@ export function renderChatPage(): string {
           const threadButtonLabel = item.thread_id ? "Open thread" : "Start thread";
           bubble.innerHTML = [
             "<div style='display:flex; justify-content:space-between; gap:12px; align-items:center;'>",
-            "<strong>" + escapeClientHtml(item.sender_user_id || "unknown sender") + "</strong>",
+            "<strong>" + escapeClientHtml(formatSenderLabel(item)) + "</strong>",
             "<time class='hint'>" + escapeClientHtml(formatTimestamp(item.created_at)) + "</time>",
             "</div>",
             "<p class='preformatted' style='color:var(--text); margin:12px 0 10px;'>" + escapeClientHtml(item.text) + "</p>",
@@ -742,7 +745,7 @@ export function renderChatPage(): string {
         const sections = [
           "<article class='thread-root'>",
           "<div style='display:flex; justify-content:space-between; gap:12px; align-items:center;'>",
-          "<strong>" + escapeClientHtml(rootMessage.sender_user_id || "unknown sender") + "</strong>",
+          "<strong>" + escapeClientHtml(formatSenderLabel(rootMessage)) + "</strong>",
           "<span class='pill'>root</span>",
           "</div>",
           "<p class='preformatted' style='color:var(--text); margin:12px 0 10px;'>" + escapeClientHtml(rootMessage.text) + "</p>",
@@ -758,7 +761,7 @@ export function renderChatPage(): string {
             sections.push([
               "<article class='thread-reply'>",
               "<div style='display:flex; justify-content:space-between; gap:12px; align-items:center;'>",
-              "<strong>" + escapeClientHtml(reply.sender_user_id || "unknown sender") + "</strong>",
+              "<strong>" + escapeClientHtml(formatSenderLabel(reply)) + "</strong>",
               "<time class='hint'>" + escapeClientHtml(formatTimestamp(reply.created_at)) + "</time>",
               "</div>",
               "<p class='preformatted' style='color:var(--text); margin:12px 0 10px;'>" + escapeClientHtml(reply.text) + "</p>",

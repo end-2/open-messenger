@@ -47,6 +47,8 @@ export type FrontendMessage = {
   channel_id: string;
   thread_id: string | null;
   sender_user_id: string;
+  sender_username: string | null;
+  sender_display_name: string | null;
   content_ref: string;
   text: string;
   attachments: string[];

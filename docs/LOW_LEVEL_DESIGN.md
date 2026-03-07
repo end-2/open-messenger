@@ -139,6 +139,7 @@ Token properties:
 Base path: `/v1`
 
 For authenticated native message writes, the service derives `sender_user_id` from the bearer token subject rather than trusting a client-supplied sender field.
+Message responses resolve sender identity fields from the stored user record and return `sender_username` and `sender_display_name` alongside `sender_user_id` when available.
 
 Representative endpoints:
 

@@ -291,13 +291,35 @@ async def ensure_attachment_files_exist(
             )
 
 
+async def resolve_sender_identity(
+    metadata_store: Any,
+    sender_user_id: str,
+) -> tuple[str | None, str | None]:
+    if not sender_user_id or sender_user_id == "system":
+        return None, None
+
+    sender = await metadata_store.get_user(sender_user_id)
+    if sender is None:
+        return None, None
+
+    username = str(sender.get("username", "")).strip() or None
+    display_name_raw = sender.get("display_name")
+    display_name = (
+        str(display_name_raw).strip()
+        if isinstance(display_name_raw, str) and display_name_raw.strip()
+        else None
+    )
+    return username, display_name
+
+
 async def hydrate_message_response(
     stored_message: dict[str, Any],
+    metadata_store: Any,
     content_store: Any,
 ) -> dict[str, Any]:
     content_ref = str(stored_message["content_ref"])
     content_payload = await content_store.get(content_ref) or {}
-    return build_message_response(stored_message, content_payload)
+    return await build_message_response(stored_message, content_payload, metadata_store)
 
 
 async def ensure_thread_for_root_message(
@@ -483,15 +505,23 @@ async def require_admin_access(
         )
 
 
-def build_message_response(
+async def build_message_response(
     metadata: dict[str, Any],
     content_payload: dict[str, Any],
+    metadata_store: Any,
 ) -> dict[str, Any]:
+    sender_user_id = str(metadata.get("sender_user_id", "system"))
+    sender_username, sender_display_name = await resolve_sender_identity(
+        metadata_store,
+        sender_user_id,
+    )
     return {
         "message_id": str(metadata["message_id"]),
         "channel_id": str(metadata["channel_id"]),
         "thread_id": metadata.get("thread_id"),
-        "sender_user_id": str(metadata.get("sender_user_id", "system")),
+        "sender_user_id": sender_user_id,
+        "sender_username": sender_username,
+        "sender_display_name": sender_display_name,
         "content_ref": str(metadata["content_ref"]),
         "text": str(content_payload.get("text", "")),
         "attachments": list(metadata.get("attachments", [])),
@@ -527,7 +557,11 @@ async def store_message(
         if existing is not None:
             existing_content = await content_store.get(str(existing["content_ref"])) or {}
             occurred_at = str(existing.get("updated_at") or existing.get("created_at") or now)
-            return build_message_response(existing, existing_content), occurred_at, False
+            return (
+                await build_message_response(existing, existing_content, metadata_store),
+                occurred_at,
+                False,
+            )
 
     await ensure_attachment_files_exist(metadata_store, payload.attachments)
 
@@ -554,7 +588,7 @@ async def store_message(
         metadata=payload.metadata,
     ).to_dict()
     stored_metadata = await metadata_store.create_message(message_metadata)
-    return build_message_response(stored_metadata, content_payload), now, True
+    return await build_message_response(stored_metadata, content_payload, metadata_store), now, True
 
 
 async def increment_thread_reply(

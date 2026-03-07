@@ -112,6 +112,8 @@ test("BackendClient supports thread workflows", async () => {
             channel_id: "ch_1",
             thread_id: null,
             sender_user_id: "usr_1",
+            sender_username: "alice",
+            sender_display_name: "Alice",
             content_ref: "cnt_root",
             text: "root",
             attachments: [],
@@ -135,6 +137,8 @@ test("BackendClient supports thread workflows", async () => {
         channel_id: "ch_1",
         thread_id: "th_1",
         sender_user_id: "usr_1",
+        sender_username: "alice",
+        sender_display_name: "Alice",
         content_ref: "cnt_reply",
         text: "reply",
         attachments: [],
@@ -156,6 +160,7 @@ test("BackendClient supports thread workflows", async () => {
 
   assert.equal(thread.thread_id, "th_1");
   assert.equal(context.thread.root_message_id, "msg_root");
+  assert.equal(context.root_message.sender_display_name, "Alice");
   assert.equal(reply.thread_id, "th_1");
   assert.match(calls[0].url, /\/v1\/channels\/ch_1\/threads$/);
   assert.match(calls[1].url, /\/v1\/threads\/th_1\/context$/);

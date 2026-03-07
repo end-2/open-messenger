@@ -47,7 +47,7 @@ def _issue_bearer_headers(client: TestClient, scopes: list[str] | None = None) -
 
 def _issue_bearer_identity(
     client: TestClient, scopes: list[str] | None = None
-) -> tuple[dict[str, str], str]:
+) -> tuple[dict[str, str], dict[str, str]]:
     granted_scopes = scopes if scopes is not None else DEFAULT_NATIVE_SCOPES
 
     user_response = client.post(
@@ -56,17 +56,17 @@ def _issue_bearer_identity(
         headers=_admin_headers(),
     )
     assert user_response.status_code == 201
-    user_id = user_response.json()["user_id"]
+    user_payload = user_response.json()
 
     token_response = client.post(
         "/admin/v1/tokens",
-        json={"user_id": user_id, "token_type": "user_token", "scopes": granted_scopes},
+        json={"user_id": user_payload["user_id"], "token_type": "user_token", "scopes": granted_scopes},
         headers=_admin_headers(),
     )
     assert token_response.status_code == 201
     token = token_response.json()["token"]
 
-    return {"Authorization": f"Bearer {token}"}, user_id
+    return {"Authorization": f"Bearer {token}"}, user_payload
 
 
 def _create_channel(client: TestClient, headers: dict[str, str], name: str = "general") -> str:
@@ -160,7 +160,7 @@ def test_post_and_list_channel_messages_with_cursor() -> None:
 
 def test_native_message_sender_uses_authenticated_user() -> None:
     client = TestClient(create_app())
-    headers, user_id = _issue_bearer_identity(client)
+    headers, user = _issue_bearer_identity(client)
     channel_id = _create_channel(client, headers)
 
     response = client.post(
@@ -170,7 +170,9 @@ def test_native_message_sender_uses_authenticated_user() -> None:
     )
 
     assert response.status_code == 201
-    assert response.json()["sender_user_id"] == user_id
+    assert response.json()["sender_user_id"] == user["user_id"]
+    assert response.json()["sender_username"] == user["username"]
+    assert response.json()["sender_display_name"] == user["display_name"]
 
 
 def test_create_message_with_uploaded_attachment() -> None:
@@ -339,7 +341,7 @@ def test_batch_create_validates_thread_channel_membership() -> None:
 
 def test_thread_context_returns_root_and_limited_replies() -> None:
     client = TestClient(create_app())
-    headers = _issue_bearer_headers(client)
+    headers, user = _issue_bearer_identity(client)
     channel_id = _create_channel(client, headers)
 
     root = client.post(
@@ -375,7 +377,10 @@ def test_thread_context_returns_root_and_limited_replies() -> None:
     payload = response.json()
     assert payload["thread"]["thread_id"] == thread_id
     assert payload["root_message"]["text"] == "root"
+    assert payload["root_message"]["sender_display_name"] == user["display_name"]
+    assert payload["root_message"]["sender_username"] == user["username"]
     assert [item["text"] for item in payload["replies"]] == ["reply-1", "reply-2"]
+    assert all(item["sender_display_name"] == user["display_name"] for item in payload["replies"])
     assert payload["has_more_replies"] is True
 
 
@@ -472,7 +477,7 @@ def test_create_thread_reuses_existing_root_thread() -> None:
 
 def test_native_thread_reply_sender_uses_authenticated_user() -> None:
     client = TestClient(create_app())
-    headers, user_id = _issue_bearer_identity(client)
+    headers, user = _issue_bearer_identity(client)
     channel_id = _create_channel(client, headers)
 
     root_response = client.post(
@@ -496,7 +501,9 @@ def test_native_thread_reply_sender_uses_authenticated_user() -> None:
     )
 
     assert reply_response.status_code == 201
-    assert reply_response.json()["sender_user_id"] == user_id
+    assert reply_response.json()["sender_user_id"] == user["user_id"]
+    assert reply_response.json()["sender_username"] == user["username"]
+    assert reply_response.json()["sender_display_name"] == user["display_name"]
 
 
 def test_thread_endpoints_validate_target_entities() -> None:
