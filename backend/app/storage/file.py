@@ -140,6 +140,14 @@ class FileMetadataStore(MetadataStore):
             return None
         return deepcopy(record)
 
+    async def get_thread_by_root_message(self, root_message_id: str) -> dict[str, Any] | None:
+        with self._lock:
+            database = self._read_database()
+            for thread in database["threads"].values():
+                if str(thread.get("root_message_id")) == root_message_id:
+                    return deepcopy(thread)
+        return None
+
     async def update_thread(self, thread_id: str, patch: dict[str, Any]) -> dict[str, Any] | None:
         with self._lock:
             database = self._read_database()
@@ -226,6 +234,44 @@ class FileMetadataStore(MetadataStore):
             return None
         return deepcopy(record)
 
+    async def create_compat_mapping(self, mapping: dict[str, Any]) -> dict[str, Any]:
+        origin = str(mapping["origin"])
+        entity_type = str(mapping["entity_type"])
+        external_id = str(mapping["external_id"])
+        channel_id = mapping.get("channel_id")
+        record = deepcopy(mapping)
+        key = self._compat_key(origin, entity_type, external_id, channel_id)
+
+        with self._lock:
+            database = self._read_database()
+            database["compat_mappings"][key] = record
+            self._write_database(database)
+        return deepcopy(record)
+
+    async def get_compat_mapping(
+        self,
+        origin: str,
+        entity_type: str,
+        external_id: str,
+        channel_id: str | None = None,
+    ) -> dict[str, Any] | None:
+        key = self._compat_key(origin, entity_type, external_id, channel_id)
+        with self._lock:
+            database = self._read_database()
+            record = database["compat_mappings"].get(key)
+        if record is None:
+            return None
+        return deepcopy(record)
+
+    async def next_compat_sequence(self, origin: str, channel_id: str) -> int:
+        key = f"{origin}:{channel_id}"
+        with self._lock:
+            database = self._read_database()
+            current = int(database["compat_sequences"].get(key, 0)) + 1
+            database["compat_sequences"][key] = current
+            self._write_database(database)
+        return current
+
     def _initialize(self) -> None:
         if self._db_path.exists():
             return
@@ -237,6 +283,8 @@ class FileMetadataStore(MetadataStore):
             "messages": {},
             "files": {},
             "channel_index": {},
+            "compat_mappings": {},
+            "compat_sequences": {},
         }
         self._write_database(empty_db)
 
@@ -250,6 +298,8 @@ class FileMetadataStore(MetadataStore):
         database.setdefault("messages", {})
         database.setdefault("files", {})
         database.setdefault("channel_index", {})
+        database.setdefault("compat_mappings", {})
+        database.setdefault("compat_sequences", {})
         return database
 
     def _write_database(self, payload: dict[str, Any]) -> None:
@@ -257,3 +307,13 @@ class FileMetadataStore(MetadataStore):
         with tmp_path.open("w", encoding="utf-8") as fp:
             json.dump(payload, fp, ensure_ascii=True, separators=(",", ":"))
         tmp_path.replace(self._db_path)
+
+    @staticmethod
+    def _compat_key(
+        origin: str,
+        entity_type: str,
+        external_id: str,
+        channel_id: str | None,
+    ) -> str:
+        normalized_channel_id = channel_id if channel_id is not None else "*"
+        return f"{origin}:{entity_type}:{normalized_channel_id}:{external_id}"

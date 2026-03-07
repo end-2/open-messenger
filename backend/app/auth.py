@@ -110,6 +110,14 @@ async def authenticate_bearer_token(
             detail="Missing bearer token",
         )
 
+    return await authenticate_raw_token(raw_token, request, settings)
+
+
+async def authenticate_raw_token(
+    raw_token: str,
+    request: Request,
+    settings: Settings,
+) -> AuthContext:
     try:
         payload = decode_and_verify_jwt_like_token(raw_token, settings.token_signing_secret)
     except ValueError:

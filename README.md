@@ -97,6 +97,14 @@ curl -X POST http://localhost:8000/v1/channels/<channel_id>/messages -H "Content
 curl "http://localhost:8000/v1/channels/<channel_id>/messages?limit=20" -H "Authorization: Bearer <token>"
 ```
 
+Compatibility endpoints:
+
+```bash
+curl -X POST http://localhost:8000/compat/slack/chat.postMessage -H "Content-Type: application/json" -H "Authorization: Bearer <token>" -d '{"channel":"<channel_id>","text":"hello from slack"}'
+curl -X POST http://localhost:8000/compat/telegram/bot<token>/sendMessage -H "Content-Type: application/json" -d '{"chat_id":"<channel_id>","text":"hello from telegram"}'
+curl -X POST http://localhost:8000/compat/discord/channels/<channel_id>/messages -H "Content-Type: application/json" -H "Authorization: Bot <token>" -d '{"content":"hello from discord"}'
+```
+
 Upload and download a file:
 
 ```bash
@@ -150,6 +158,7 @@ When request volume exceeds the configured window on `/v1` or `/admin/v1`, the A
 
 `/v1/info` reports the configured backend names and selected store implementation classes.
 `memory`, `file`, `redis`, and `mysql` backends are implemented.
+Slack `thread_ts`, Telegram `reply_to_message_id`, and Discord `message_reference` are mapped onto internal thread/reply relationships through metadata-backed compatibility mappings.
 
 ## Storage Configuration
 

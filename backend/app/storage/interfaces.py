@@ -46,6 +46,9 @@ class MetadataStore(Protocol):
     async def get_thread(self, thread_id: str) -> dict[str, Any] | None:
         ...
 
+    async def get_thread_by_root_message(self, root_message_id: str) -> dict[str, Any] | None:
+        ...
+
     async def update_thread(self, thread_id: str, patch: dict[str, Any]) -> dict[str, Any] | None:
         ...
 
@@ -75,4 +78,19 @@ class MetadataStore(Protocol):
         ...
 
     async def get_file(self, file_id: str) -> dict[str, Any] | None:
+        ...
+
+    async def create_compat_mapping(self, mapping: dict[str, Any]) -> dict[str, Any]:
+        ...
+
+    async def get_compat_mapping(
+        self,
+        origin: str,
+        entity_type: str,
+        external_id: str,
+        channel_id: str | None = None,
+    ) -> dict[str, Any] | None:
+        ...
+
+    async def next_compat_sequence(self, origin: str, channel_id: str) -> int:
         ...

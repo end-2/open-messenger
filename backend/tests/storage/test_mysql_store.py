@@ -15,6 +15,8 @@ class InMemoryMySQLMetadataStore(MySQLMetadataStore):
         self._threads: dict[str, str] = {}
         self._messages: dict[str, dict[str, object]] = {}
         self._files: dict[str, str] = {}
+        self._compat_mappings: dict[tuple[str, str, str | None, str], str] = {}
+        self._compat_sequences: dict[tuple[str, str], int] = {}
         self._schema_initialized = True
         self._sequence_id = 0
 
@@ -71,6 +73,13 @@ class InMemoryMySQLMetadataStore(MySQLMetadataStore):
             entity_id, payload = params
             self._files[str(entity_id)] = str(payload)
             return 1
+        if "insert into" in normalized and self._table("compat_mappings") in normalized:
+            mapping_id, origin, entity_type, channel_id, external_id, payload = params
+            del mapping_id
+            self._compat_mappings[(str(origin), str(entity_type), channel_id, str(external_id))] = str(
+                payload
+            )
+            return 1
         return 0
 
     def _run_fetchone_sync(self, sql: str, params=()):
@@ -89,6 +98,13 @@ class InMemoryMySQLMetadataStore(MySQLMetadataStore):
             payload = self._channels.get(entity_id)
             return {"payload": payload} if payload is not None else None
         if "from" in normalized and self._table("threads") in normalized:
+            if "root_message_id" in normalized:
+                root_message_id = str(params[0])
+                for payload in self._threads.values():
+                    decoded = json.loads(payload)
+                    if str(decoded.get("root_message_id")) == root_message_id:
+                        return {"payload": payload}
+                return None
             entity_id = str(params[0])
             payload = self._threads.get(entity_id)
             return {"payload": payload} if payload is not None else None
@@ -135,6 +151,16 @@ class InMemoryMySQLMetadataStore(MySQLMetadataStore):
             entity_id = str(params[0])
             payload = self._files.get(entity_id)
             return {"payload": payload} if payload is not None else None
+        if "from" in normalized and self._table("compat_mappings") in normalized:
+            if "channel_id is null" in normalized:
+                origin, entity_type, external_id = params
+                payload = self._compat_mappings.get((str(origin), str(entity_type), None, str(external_id)))
+            else:
+                origin, entity_type, channel_id, external_id = params
+                payload = self._compat_mappings.get(
+                    (str(origin), str(entity_type), str(channel_id), str(external_id))
+                )
+            return {"payload": payload} if payload is not None else None
         return None
 
     def _run_fetchall_sync(self, sql: str, params=()):
@@ -162,6 +188,12 @@ class InMemoryMySQLMetadataStore(MySQLMetadataStore):
             if str(row["channel_id"]) == channel_id
         ]
         return selected[:limit]
+
+    def _next_compat_sequence_sync(self, origin: str, channel_id: str) -> int:
+        key = (origin, channel_id)
+        value = self._compat_sequences.get(key, 0) + 1
+        self._compat_sequences[key] = value
+        return value
 
 
 def test_parse_mysql_dsn_success() -> None:
@@ -306,6 +338,27 @@ def test_mysql_metadata_store_contract_with_in_memory_backend() -> None:
         )
     )
     assert asyncio.run(store.get_file("fil-1")) == created_file
+    assert asyncio.run(store.get_thread_by_root_message("msg-1")) == updated_thread
+
+    mapping = asyncio.run(
+        store.create_compat_mapping(
+            {
+                "mapping_id": "map-1",
+                "origin": "slack",
+                "entity_type": "message",
+                "channel_id": "channel-a",
+                "external_id": "123.000001",
+                "internal_id": "msg-1",
+                "created_at": "2026-03-03T00:00:00Z",
+            }
+        )
+    )
+    assert (
+        asyncio.run(store.get_compat_mapping("slack", "message", "123.000001", "channel-a"))
+        == mapping
+    )
+    assert asyncio.run(store.next_compat_sequence("slack", "channel-a")) == 1
+    assert asyncio.run(store.next_compat_sequence("slack", "channel-a")) == 2
 
 
 def test_mysql_metadata_store_serialization_roundtrip() -> None:

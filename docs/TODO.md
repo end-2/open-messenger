@@ -62,14 +62,14 @@
 
 ## 7. Compatibility API
 
-- [ ] Slack 호환: `POST /compat/slack/chat.postMessage`
-- [ ] Slack 호환: `POST /compat/slack/files.upload`
-- [ ] Telegram 호환: `POST /compat/telegram/bot{token}/sendMessage`
-- [ ] Telegram 호환: `POST /compat/telegram/bot{token}/sendDocument`
-- [ ] Discord 호환: `POST /compat/discord/channels/{channel_id}/messages`
-- [ ] Slack `thread_ts` <-> 내부 `thread_id` 매핑 테이블 구현
-- [ ] Telegram `reply_to_message_id` 매핑 구현
-- [ ] Discord `message_reference` 매핑 구현
+- [x] Slack 호환: `POST /compat/slack/chat.postMessage`
+- [x] Slack 호환: `POST /compat/slack/files.upload`
+- [x] Telegram 호환: `POST /compat/telegram/bot{token}/sendMessage`
+- [x] Telegram 호환: `POST /compat/telegram/bot{token}/sendDocument`
+- [x] Discord 호환: `POST /compat/discord/channels/{channel_id}/messages`
+- [x] Slack `thread_ts` <-> 내부 `thread_id` 매핑 테이블 구현
+- [x] Telegram `reply_to_message_id` 매핑 구현
+- [x] Discord `message_reference` 매핑 구현
 
 ## 8. 실시간 이벤트
 

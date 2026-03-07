@@ -1,17 +1,25 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import re
 import secrets
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal, Optional
 
-from fastapi import APIRouter, Depends, File, Query, Request, Response, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, Query, Request, Response, UploadFile, status
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
-from app.auth import AuthContext, create_jwt_like_token, require_scopes, sha256_hexdigest
+from app.auth import (
+    AuthContext,
+    authenticate_raw_token,
+    create_jwt_like_token,
+    require_scopes,
+    sha256_hexdigest,
+)
 from app.config import Settings, get_settings
 from app.domain import Channel, FileObject, Message, MessageContent, Thread, Token, User
 from app.errors import api_error
@@ -118,6 +126,27 @@ class FileObjectResponse(BaseModel):
     created_at: str
 
 
+class SlackPostMessageRequest(BaseModel):
+    channel: str = Field(min_length=1)
+    text: str = Field(min_length=1)
+    thread_ts: Optional[str] = None
+
+
+class TelegramSendMessageRequest(BaseModel):
+    chat_id: str = Field(min_length=1)
+    text: str = Field(min_length=1)
+    reply_to_message_id: Optional[int] = None
+
+
+class DiscordMessageReferenceRequest(BaseModel):
+    message_id: str = Field(min_length=1)
+
+
+class DiscordCreateMessageRequest(BaseModel):
+    content: str = Field(min_length=1)
+    message_reference: Optional[DiscordMessageReferenceRequest] = None
+
+
 def _utc_now_iso() -> str:
     return utc_now_iso8601()
 
@@ -143,6 +172,228 @@ def _build_file_response(stored: dict[str, Any]) -> dict[str, Any]:
         "sha256": str(stored.get("sha256", "")),
         "created_at": str(stored.get("created_at", "")),
     }
+
+
+def _unix_timestamp_seconds(iso_timestamp: str) -> int:
+    normalized = iso_timestamp.replace("Z", "+00:00")
+    return int(datetime.fromisoformat(normalized).replace(tzinfo=timezone.utc).timestamp())
+
+
+def _slack_ts_from_sequence(sequence: int, iso_timestamp: str) -> str:
+    return f"{_unix_timestamp_seconds(iso_timestamp)}.{sequence:06d}"
+
+
+def _discord_message_id_from_sequence(sequence: int, iso_timestamp: str) -> str:
+    return f"{_unix_timestamp_seconds(iso_timestamp)}{sequence:06d}"
+
+
+async def _authenticate_compat_bearer_token(
+    request: Request,
+    required_scopes: list[str],
+) -> AuthContext:
+    auth_header = request.headers.get("authorization", "")
+    raw_token = ""
+    for prefix in ("Bearer ", "Bot "):
+        if auth_header.startswith(prefix):
+            raw_token = auth_header[len(prefix) :].strip()
+            break
+
+    if not raw_token:
+        raise api_error(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            code="unauthorized",
+            message="Missing bearer token",
+            retryable=False,
+        )
+
+    settings: Settings = request.app.state.settings
+    context = await authenticate_raw_token(raw_token, request, settings)
+    for required_scope in required_scopes:
+        if required_scope not in context.scopes and f"{required_scope.split(':', 1)[0]}:*" not in context.scopes and "*" not in context.scopes:
+            raise api_error(
+                status_code=status.HTTP_403_FORBIDDEN,
+                code="forbidden",
+                message=f"Missing required scope: {required_scope}",
+                retryable=False,
+            )
+    return context
+
+
+async def _authenticate_telegram_bot_token(
+    request: Request,
+    raw_token: str,
+    required_scopes: list[str],
+) -> AuthContext:
+    settings: Settings = request.app.state.settings
+    context = await authenticate_raw_token(raw_token, request, settings)
+    for required_scope in required_scopes:
+        if required_scope not in context.scopes and f"{required_scope.split(':', 1)[0]}:*" not in context.scopes and "*" not in context.scopes:
+            raise api_error(
+                status_code=status.HTTP_403_FORBIDDEN,
+                code="forbidden",
+                message=f"Missing required scope: {required_scope}",
+                retryable=False,
+            )
+    return context
+
+
+async def _get_channel_or_404(metadata_store: Any, channel_id: str) -> dict[str, Any]:
+    channel = await metadata_store.get_channel(channel_id)
+    if channel is None:
+        raise api_error(
+            status_code=status.HTTP_404_NOT_FOUND,
+            code="channel_not_found",
+            message="Channel not found",
+            retryable=False,
+        )
+    return channel
+
+
+async def _store_uploaded_file(
+    settings: Settings,
+    metadata_store: Any,
+    upload: UploadFile,
+    uploader_user_id: str,
+) -> dict[str, Any]:
+    files_root = Path(settings.files_root_dir)
+    files_root.mkdir(parents=True, exist_ok=True)
+
+    file_id = _new_id("fil")
+    safe_filename = _sanitize_filename(upload.filename)
+    storage_path = files_root / f"{file_id}_{safe_filename}"
+    max_size_bytes = int(settings.max_upload_mb * 1024 * 1024)
+
+    digest = hashlib.sha256()
+    size_bytes = 0
+
+    try:
+        with storage_path.open("wb") as fp:
+            while True:
+                chunk = await upload.read(1024 * 1024)
+                if not chunk:
+                    break
+                size_bytes += len(chunk)
+                if size_bytes > max_size_bytes:
+                    fp.close()
+                    storage_path.unlink(missing_ok=True)
+                    raise api_error(
+                        status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                        code="file_too_large",
+                        message=f"File exceeds max upload size of {settings.max_upload_mb} MB",
+                        retryable=False,
+                    )
+                digest.update(chunk)
+                fp.write(chunk)
+    finally:
+        await upload.close()
+
+    file_object = FileObject(
+        file_id=file_id,
+        uploader_user_id=uploader_user_id,
+        filename=safe_filename,
+        mime_type=upload.content_type or "application/octet-stream",
+        size_bytes=size_bytes,
+        storage_path=str(storage_path),
+        sha256=digest.hexdigest(),
+    ).to_dict()
+    return await metadata_store.create_file(file_object)
+
+
+async def _ensure_thread_for_root_message(
+    metadata_store: Any,
+    channel_id: str,
+    root_message_id: str,
+) -> dict[str, Any]:
+    existing = await metadata_store.get_thread_by_root_message(root_message_id)
+    if existing is not None:
+        return existing
+
+    root_message = await metadata_store.get_message(root_message_id)
+    if root_message is None or str(root_message.get("channel_id")) != channel_id:
+        raise api_error(
+            status_code=status.HTTP_404_NOT_FOUND,
+            code="root_message_not_found",
+            message="Root message not found",
+            retryable=False,
+        )
+
+    now = _utc_now_iso()
+    thread = Thread(
+        thread_id=_new_id("th"),
+        channel_id=channel_id,
+        root_message_id=root_message_id,
+        reply_count=0,
+        last_message_at=str(root_message.get("created_at", now)),
+        created_at=now,
+    ).to_dict()
+    return await metadata_store.create_thread(thread)
+
+
+async def _resolve_reply_thread_from_external_message(
+    metadata_store: Any,
+    origin: str,
+    channel_id: str,
+    external_message_id: str,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    mapping = await metadata_store.get_compat_mapping(
+        origin=origin,
+        entity_type="message",
+        external_id=external_message_id,
+        channel_id=channel_id,
+    )
+    if mapping is None:
+        raise api_error(
+            status_code=status.HTTP_404_NOT_FOUND,
+            code="message_not_found",
+            message="Referenced message not found",
+            retryable=False,
+        )
+
+    internal_message = await metadata_store.get_message(str(mapping["internal_id"]))
+    if internal_message is None:
+        raise api_error(
+            status_code=status.HTTP_404_NOT_FOUND,
+            code="message_not_found",
+            message="Referenced message not found",
+            retryable=False,
+        )
+
+    thread_id = internal_message.get("thread_id")
+    if thread_id is not None:
+        thread = await metadata_store.get_thread(str(thread_id))
+        if thread is None:
+            raise api_error(
+                status_code=status.HTTP_404_NOT_FOUND,
+                code="thread_not_found",
+                message="Thread not found",
+                retryable=False,
+            )
+        return internal_message, thread
+
+    thread = await _ensure_thread_for_root_message(metadata_store, channel_id, str(internal_message["message_id"]))
+    return internal_message, thread
+
+
+async def _register_compat_mapping(
+    metadata_store: Any,
+    *,
+    origin: str,
+    entity_type: str,
+    channel_id: str | None,
+    external_id: str,
+    internal_id: str,
+) -> dict[str, Any]:
+    return await metadata_store.create_compat_mapping(
+        {
+            "mapping_id": _new_id("map"),
+            "origin": origin,
+            "entity_type": entity_type,
+            "channel_id": channel_id,
+            "external_id": external_id,
+            "internal_id": internal_id,
+            "created_at": _utc_now_iso(),
+        }
+    )
 
 
 async def _issue_admin_token(
@@ -239,6 +490,7 @@ async def _store_message(
     metadata_store: Any,
     content_store: Any,
     force_thread_id: Optional[str] = None,
+    compat_origin: str = "native",
 ) -> tuple[dict[str, Any], str, bool]:
     message_id = _new_id("msg")
     content_ref = _new_id("cnt")
@@ -275,7 +527,7 @@ async def _store_message(
         created_at=now,
         updated_at=now,
         deleted_at=None,
-        compat_origin="native",
+        compat_origin=compat_origin,
         idempotency_key=payload.idempotency_key,
         metadata=payload.metadata,
     ).to_dict()
@@ -573,49 +825,7 @@ async def upload_file(
 ) -> dict[str, Any]:
     settings: Settings = request.app.state.settings
     metadata_store = request.app.state.metadata_store
-
-    files_root = Path(settings.files_root_dir)
-    files_root.mkdir(parents=True, exist_ok=True)
-
-    file_id = _new_id("fil")
-    safe_filename = _sanitize_filename(file.filename)
-    storage_path = files_root / f"{file_id}_{safe_filename}"
-    max_size_bytes = int(settings.max_upload_mb * 1024 * 1024)
-
-    digest = hashlib.sha256()
-    size_bytes = 0
-
-    try:
-        with storage_path.open("wb") as fp:
-            while True:
-                chunk = await file.read(1024 * 1024)
-                if not chunk:
-                    break
-                size_bytes += len(chunk)
-                if size_bytes > max_size_bytes:
-                    fp.close()
-                    storage_path.unlink(missing_ok=True)
-                    raise api_error(
-                        status_code=status.HTTP_413_CONTENT_TOO_LARGE,
-                        code="file_too_large",
-                        message=f"File exceeds max upload size of {settings.max_upload_mb} MB",
-                        retryable=False,
-                    )
-                digest.update(chunk)
-                fp.write(chunk)
-    finally:
-        await file.close()
-
-    file_object = FileObject(
-        file_id=file_id,
-        uploader_user_id=context.user_id,
-        filename=safe_filename,
-        mime_type=file.content_type or "application/octet-stream",
-        size_bytes=size_bytes,
-        storage_path=str(storage_path),
-        sha256=digest.hexdigest(),
-    ).to_dict()
-    stored = await metadata_store.create_file(file_object)
+    stored = await _store_uploaded_file(settings, metadata_store, file, context.user_id)
     return _build_file_response(stored)
 
 
@@ -649,6 +859,404 @@ async def get_file(
         media_type=str(file_object.get("mime_type") or "application/octet-stream"),
         filename=str(file_object.get("filename") or storage_path.name),
     )
+
+
+@router.post("/compat/slack/chat.postMessage")
+async def slack_chat_post_message(
+    payload: SlackPostMessageRequest,
+    request: Request,
+) -> dict[str, Any]:
+    metadata_store = request.app.state.metadata_store
+    content_store = request.app.state.content_store
+    context = await _authenticate_compat_bearer_token(request, ["messages:write"])
+
+    await _get_channel_or_404(metadata_store, payload.channel)
+
+    resolved_thread_id: str | None = None
+    thread_ts = payload.thread_ts
+    if thread_ts is not None:
+        thread_mapping = await metadata_store.get_compat_mapping(
+            origin="slack",
+            entity_type="thread",
+            external_id=thread_ts,
+            channel_id=payload.channel,
+        )
+        if thread_mapping is not None:
+            resolved_thread_id = str(thread_mapping["internal_id"])
+        else:
+            _, thread = await _resolve_reply_thread_from_external_message(
+                metadata_store,
+                origin="slack",
+                channel_id=payload.channel,
+                external_message_id=thread_ts,
+            )
+            resolved_thread_id = str(thread["thread_id"])
+            await _register_compat_mapping(
+                metadata_store,
+                origin="slack",
+                entity_type="thread",
+                channel_id=payload.channel,
+                external_id=thread_ts,
+                internal_id=resolved_thread_id,
+            )
+
+    message_response, occurred_at, created = await _store_message(
+        channel_id=payload.channel,
+        payload=CreateMessageRequest(
+            text=payload.text,
+            sender_user_id=context.user_id,
+            thread_id=resolved_thread_id,
+            metadata={"slack": {"thread_ts": thread_ts}},
+            raw_payload=payload.model_dump(exclude_none=True),
+        ),
+        metadata_store=metadata_store,
+        content_store=content_store,
+        compat_origin="slack",
+    )
+    if resolved_thread_id is not None and created:
+        await _increment_thread_reply(metadata_store, resolved_thread_id, occurred_at)
+
+    sequence = await metadata_store.next_compat_sequence("slack", payload.channel)
+    message_ts = _slack_ts_from_sequence(sequence, occurred_at)
+    await _register_compat_mapping(
+        metadata_store,
+        origin="slack",
+        entity_type="message",
+        channel_id=payload.channel,
+        external_id=message_ts,
+        internal_id=str(message_response["message_id"]),
+    )
+
+    effective_thread_ts = thread_ts or message_ts
+    return {
+        "ok": True,
+        "channel": payload.channel,
+        "ts": message_ts,
+        "message": {
+            "text": message_response["text"],
+            "user": message_response["sender_user_id"],
+            "ts": message_ts,
+            "thread_ts": effective_thread_ts,
+        },
+    }
+
+
+@router.post("/compat/slack/files.upload")
+async def slack_files_upload(
+    request: Request,
+    channels: str = Form(...),
+    file: UploadFile = File(...),
+    thread_ts: Optional[str] = Form(default=None),
+    initial_comment: Optional[str] = Form(default=None),
+) -> dict[str, Any]:
+    settings: Settings = request.app.state.settings
+    metadata_store = request.app.state.metadata_store
+    content_store = request.app.state.content_store
+    context = await _authenticate_compat_bearer_token(request, ["files:write", "messages:write"])
+
+    channel_id = channels.split(",", 1)[0].strip()
+    await _get_channel_or_404(metadata_store, channel_id)
+
+    stored_file = await _store_uploaded_file(settings, metadata_store, file, context.user_id)
+
+    resolved_thread_id: str | None = None
+    if thread_ts is not None:
+        _, thread = await _resolve_reply_thread_from_external_message(
+            metadata_store,
+            origin="slack",
+            channel_id=channel_id,
+            external_message_id=thread_ts,
+        )
+        resolved_thread_id = str(thread["thread_id"])
+        await _register_compat_mapping(
+            metadata_store,
+            origin="slack",
+            entity_type="thread",
+            channel_id=channel_id,
+            external_id=thread_ts,
+            internal_id=resolved_thread_id,
+        )
+
+    text = initial_comment or f"Uploaded file: {stored_file['filename']}"
+    message_response, occurred_at, created = await _store_message(
+        channel_id=channel_id,
+        payload=CreateMessageRequest(
+            text=text,
+            sender_user_id=context.user_id,
+            thread_id=resolved_thread_id,
+            attachments=[str(stored_file["file_id"])],
+            metadata={"slack": {"thread_ts": thread_ts}},
+        ),
+        metadata_store=metadata_store,
+        content_store=content_store,
+        compat_origin="slack",
+    )
+    if resolved_thread_id is not None and created:
+        await _increment_thread_reply(metadata_store, resolved_thread_id, occurred_at)
+
+    sequence = await metadata_store.next_compat_sequence("slack", channel_id)
+    message_ts = _slack_ts_from_sequence(sequence, occurred_at)
+    await _register_compat_mapping(
+        metadata_store,
+        origin="slack",
+        entity_type="message",
+        channel_id=channel_id,
+        external_id=message_ts,
+        internal_id=str(message_response["message_id"]),
+    )
+
+    return {
+        "ok": True,
+        "file": {
+            "id": stored_file["file_id"],
+            "name": stored_file["filename"],
+            "mimetype": stored_file["mime_type"],
+            "size": stored_file["size_bytes"],
+            "url_private_download": f"/v1/files/{stored_file['file_id']}",
+        },
+        "message": {
+            "channel": channel_id,
+            "ts": message_ts,
+            "text": message_response["text"],
+        },
+    }
+
+
+@router.post("/compat/telegram/bot{bot_token}/sendMessage")
+async def telegram_send_message(
+    bot_token: str,
+    payload: TelegramSendMessageRequest,
+    request: Request,
+) -> dict[str, Any]:
+    metadata_store = request.app.state.metadata_store
+    content_store = request.app.state.content_store
+    context = await _authenticate_telegram_bot_token(request, bot_token, ["messages:write"])
+
+    await _get_channel_or_404(metadata_store, payload.chat_id)
+
+    resolved_thread_id: str | None = None
+    if payload.reply_to_message_id is not None:
+        _, thread = await _resolve_reply_thread_from_external_message(
+            metadata_store,
+            origin="telegram",
+            channel_id=payload.chat_id,
+            external_message_id=str(payload.reply_to_message_id),
+        )
+        resolved_thread_id = str(thread["thread_id"])
+
+    message_response, occurred_at, created = await _store_message(
+        channel_id=payload.chat_id,
+        payload=CreateMessageRequest(
+            text=payload.text,
+            sender_user_id=context.user_id,
+            thread_id=resolved_thread_id,
+            metadata={"telegram": {"reply_to_message_id": payload.reply_to_message_id}},
+            raw_payload=payload.model_dump(exclude_none=True),
+        ),
+        metadata_store=metadata_store,
+        content_store=content_store,
+        compat_origin="telegram",
+    )
+    if resolved_thread_id is not None and created:
+        await _increment_thread_reply(metadata_store, resolved_thread_id, occurred_at)
+
+    external_message_id = str(await metadata_store.next_compat_sequence("telegram", payload.chat_id))
+    await _register_compat_mapping(
+        metadata_store,
+        origin="telegram",
+        entity_type="message",
+        channel_id=payload.chat_id,
+        external_id=external_message_id,
+        internal_id=str(message_response["message_id"]),
+    )
+    return {
+        "ok": True,
+        "result": {
+            "message_id": int(external_message_id),
+            "date": _unix_timestamp_seconds(occurred_at),
+            "chat": {"id": payload.chat_id, "type": "channel"},
+            "text": message_response["text"],
+        },
+    }
+
+
+@router.post("/compat/telegram/bot{bot_token}/sendDocument")
+async def telegram_send_document(
+    bot_token: str,
+    request: Request,
+    chat_id: str = Form(...),
+    document: UploadFile = File(...),
+    caption: Optional[str] = Form(default=None),
+    reply_to_message_id: Optional[int] = Form(default=None),
+) -> dict[str, Any]:
+    settings: Settings = request.app.state.settings
+    metadata_store = request.app.state.metadata_store
+    content_store = request.app.state.content_store
+    context = await _authenticate_telegram_bot_token(request, bot_token, ["files:write", "messages:write"])
+
+    await _get_channel_or_404(metadata_store, chat_id)
+    stored_file = await _store_uploaded_file(settings, metadata_store, document, context.user_id)
+
+    resolved_thread_id: str | None = None
+    if reply_to_message_id is not None:
+        _, thread = await _resolve_reply_thread_from_external_message(
+            metadata_store,
+            origin="telegram",
+            channel_id=chat_id,
+            external_message_id=str(reply_to_message_id),
+        )
+        resolved_thread_id = str(thread["thread_id"])
+
+    message_response, occurred_at, created = await _store_message(
+        channel_id=chat_id,
+        payload=CreateMessageRequest(
+            text=caption or stored_file["filename"],
+            sender_user_id=context.user_id,
+            thread_id=resolved_thread_id,
+            attachments=[str(stored_file["file_id"])],
+            metadata={"telegram": {"reply_to_message_id": reply_to_message_id}},
+        ),
+        metadata_store=metadata_store,
+        content_store=content_store,
+        compat_origin="telegram",
+    )
+    if resolved_thread_id is not None and created:
+        await _increment_thread_reply(metadata_store, resolved_thread_id, occurred_at)
+
+    external_message_id = str(await metadata_store.next_compat_sequence("telegram", chat_id))
+    await _register_compat_mapping(
+        metadata_store,
+        origin="telegram",
+        entity_type="message",
+        channel_id=chat_id,
+        external_id=external_message_id,
+        internal_id=str(message_response["message_id"]),
+    )
+    return {
+        "ok": True,
+        "result": {
+            "message_id": int(external_message_id),
+            "date": _unix_timestamp_seconds(occurred_at),
+            "chat": {"id": chat_id, "type": "channel"},
+            "caption": caption,
+            "document": {
+                "file_id": stored_file["file_id"],
+                "file_name": stored_file["filename"],
+                "mime_type": stored_file["mime_type"],
+                "file_size": stored_file["size_bytes"],
+            },
+        },
+    }
+
+
+@router.post("/compat/discord/channels/{channel_id}/messages")
+async def discord_create_message(
+    channel_id: str,
+    request: Request,
+) -> dict[str, Any]:
+    metadata_store = request.app.state.metadata_store
+    content_store = request.app.state.content_store
+    settings: Settings = request.app.state.settings
+    context = await _authenticate_compat_bearer_token(request, ["messages:write"])
+
+    await _get_channel_or_404(metadata_store, channel_id)
+
+    content_type = request.headers.get("content-type", "")
+    files: list[UploadFile] = []
+    raw_payload: dict[str, Any]
+    text: str
+    external_reference_id: str | None = None
+
+    if content_type.startswith("multipart/form-data"):
+        form = await request.form()
+        text = str(form.get("content") or "")
+        if not text:
+            raise api_error(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                code="validation_error",
+                message="Field required",
+                retryable=False,
+            )
+        raw_reference = form.get("message_reference")
+        raw_payload = {"content": text}
+        if raw_reference:
+            parsed_reference = json.loads(str(raw_reference))
+            external_reference_id = str(parsed_reference.get("message_id", ""))
+            raw_payload["message_reference"] = parsed_reference
+        for _, value in form.multi_items():
+            if hasattr(value, "filename") and hasattr(value, "read"):
+                files.append(value)
+    else:
+        raw_payload = await request.json()
+        payload = DiscordCreateMessageRequest.model_validate(raw_payload)
+        text = payload.content
+        if payload.message_reference is not None:
+            external_reference_id = payload.message_reference.message_id
+
+    attachment_ids: list[str] = []
+    attachment_payloads: list[dict[str, Any]] = []
+    for upload in files:
+        stored_file = await _store_uploaded_file(settings, metadata_store, upload, context.user_id)
+        attachment_ids.append(str(stored_file["file_id"]))
+        attachment_payloads.append(
+            {
+                "id": stored_file["file_id"],
+                "filename": stored_file["filename"],
+                "size": stored_file["size_bytes"],
+                "content_type": stored_file["mime_type"],
+                "url": f"/v1/files/{stored_file['file_id']}",
+            }
+        )
+
+    resolved_thread_id: str | None = None
+    if external_reference_id is not None:
+        _, thread = await _resolve_reply_thread_from_external_message(
+            metadata_store,
+            origin="discord",
+            channel_id=channel_id,
+            external_message_id=external_reference_id,
+        )
+        resolved_thread_id = str(thread["thread_id"])
+
+    message_response, occurred_at, created = await _store_message(
+        channel_id=channel_id,
+        payload=CreateMessageRequest(
+            text=text,
+            sender_user_id=context.user_id,
+            thread_id=resolved_thread_id,
+            attachments=attachment_ids,
+            metadata={"discord": {"message_reference": external_reference_id}},
+            raw_payload=raw_payload,
+        ),
+        metadata_store=metadata_store,
+        content_store=content_store,
+        compat_origin="discord",
+    )
+    if resolved_thread_id is not None and created:
+        await _increment_thread_reply(metadata_store, resolved_thread_id, occurred_at)
+
+    external_message_id = _discord_message_id_from_sequence(
+        await metadata_store.next_compat_sequence("discord", channel_id),
+        occurred_at,
+    )
+    await _register_compat_mapping(
+        metadata_store,
+        origin="discord",
+        entity_type="message",
+        channel_id=channel_id,
+        external_id=external_message_id,
+        internal_id=str(message_response["message_id"]),
+    )
+
+    response_payload: dict[str, Any] = {
+        "id": external_message_id,
+        "channel_id": channel_id,
+        "content": message_response["text"],
+        "attachments": attachment_payloads,
+    }
+    if external_reference_id is not None:
+        response_payload["message_reference"] = {"message_id": external_reference_id}
+    return response_payload
 
 
 @router.post(

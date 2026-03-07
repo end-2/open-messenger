@@ -164,3 +164,29 @@ def test_file_metadata_store_persists_and_paginates(tmp_path) -> None:
         )
     )
     assert asyncio.run(store.get_file("fil-1")) == created_file
+    assert asyncio.run(store.get_thread_by_root_message("msg-1")) == updated_thread
+
+    mapping = asyncio.run(
+        store.create_compat_mapping(
+            {
+                "mapping_id": "map-1",
+                "origin": "discord",
+                "entity_type": "message",
+                "channel_id": "channel-a",
+                "external_id": "42",
+                "internal_id": "msg-1",
+                "created_at": "2026-03-03T00:00:00+00:00",
+            }
+        )
+    )
+    assert (
+        asyncio.run(store.get_compat_mapping("discord", "message", "42", "channel-a")) == mapping
+    )
+    assert asyncio.run(store.next_compat_sequence("discord", "channel-a")) == 1
+    assert asyncio.run(store.next_compat_sequence("discord", "channel-a")) == 2
+
+    reloaded_store = FileMetadataStore(db_path)
+    assert (
+        asyncio.run(reloaded_store.get_compat_mapping("discord", "message", "42", "channel-a"))
+        == mapping
+    )

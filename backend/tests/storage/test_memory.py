@@ -153,3 +153,24 @@ def test_in_memory_metadata_store_message_pagination() -> None:
         )
     )
     assert asyncio.run(store.get_file("fil-1")) == created_file
+
+    assert asyncio.run(store.get_thread_by_root_message("msg-1")) == updated_thread
+
+    mapping = asyncio.run(
+        store.create_compat_mapping(
+            {
+                "mapping_id": "map-1",
+                "origin": "telegram",
+                "entity_type": "message",
+                "channel_id": "channel-a",
+                "external_id": "1",
+                "internal_id": "msg-1",
+                "created_at": "2026-03-03T00:00:00+00:00",
+            }
+        )
+    )
+    assert (
+        asyncio.run(store.get_compat_mapping("telegram", "message", "1", "channel-a")) == mapping
+    )
+    assert asyncio.run(store.next_compat_sequence("telegram", "channel-a")) == 1
+    assert asyncio.run(store.next_compat_sequence("telegram", "channel-a")) == 2

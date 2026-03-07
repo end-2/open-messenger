@@ -35,6 +35,8 @@ class InMemoryMetadataStore(MetadataStore):
         self._threads: dict[str, dict[str, Any]] = {}
         self._messages: dict[str, dict[str, Any]] = {}
         self._files: dict[str, dict[str, Any]] = {}
+        self._compat_mappings: dict[tuple[str, str, str | None, str], dict[str, Any]] = {}
+        self._compat_sequences: dict[tuple[str, str], int] = {}
         self._channel_index: dict[str, list[str]] = {}
 
     async def create_user(self, user: dict[str, Any]) -> dict[str, Any]:
@@ -92,6 +94,12 @@ class InMemoryMetadataStore(MetadataStore):
         if thread is None:
             return None
         return deepcopy(thread)
+
+    async def get_thread_by_root_message(self, root_message_id: str) -> dict[str, Any] | None:
+        for thread in self._threads.values():
+            if str(thread.get("root_message_id")) == root_message_id:
+                return deepcopy(thread)
+        return None
 
     async def update_thread(self, thread_id: str, patch: dict[str, Any]) -> dict[str, Any] | None:
         thread = self._threads.get(thread_id)
@@ -159,3 +167,32 @@ class InMemoryMetadataStore(MetadataStore):
         if record is None:
             return None
         return deepcopy(record)
+
+    async def create_compat_mapping(self, mapping: dict[str, Any]) -> dict[str, Any]:
+        record = deepcopy(mapping)
+        key = (
+            str(record["origin"]),
+            str(record["entity_type"]),
+            record.get("channel_id"),
+            str(record["external_id"]),
+        )
+        self._compat_mappings[key] = record
+        return deepcopy(record)
+
+    async def get_compat_mapping(
+        self,
+        origin: str,
+        entity_type: str,
+        external_id: str,
+        channel_id: str | None = None,
+    ) -> dict[str, Any] | None:
+        record = self._compat_mappings.get((origin, entity_type, channel_id, external_id))
+        if record is None:
+            return None
+        return deepcopy(record)
+
+    async def next_compat_sequence(self, origin: str, channel_id: str) -> int:
+        key = (origin, channel_id)
+        current = self._compat_sequences.get(key, 0) + 1
+        self._compat_sequences[key] = current
+        return current

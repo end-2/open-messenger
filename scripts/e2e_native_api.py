@@ -195,6 +195,79 @@ def run(base_url: str, admin_token: str) -> None:
         )
         _expect(downloaded.content == file_bytes, "Downloaded file content mismatch")
 
+        slack_message = _request(
+            client,
+            "POST",
+            "/compat/slack/chat.postMessage",
+            200,
+            headers=native_headers,
+            json={"channel": channel_id, "text": "hello from slack compat"},
+        ).json()
+        _expect(slack_message["ok"] is True, "Slack compat message failed")
+
+        slack_reply = _request(
+            client,
+            "POST",
+            "/compat/slack/chat.postMessage",
+            200,
+            headers=native_headers,
+            json={
+                "channel": channel_id,
+                "text": "slack compat reply",
+                "thread_ts": slack_message["ts"],
+            },
+        ).json()
+        _expect(
+            slack_reply["message"]["thread_ts"] == slack_message["ts"],
+            "Slack compat thread mapping failed",
+        )
+
+        telegram_message = _request(
+            client,
+            "POST",
+            f"/compat/telegram/bot{bearer_token}/sendMessage",
+            200,
+            json={"chat_id": channel_id, "text": "hello from telegram compat"},
+        ).json()
+        _expect(telegram_message["ok"] is True, "Telegram compat message failed")
+
+        telegram_document = _request(
+            client,
+            "POST",
+            f"/compat/telegram/bot{bearer_token}/sendDocument",
+            200,
+            data={"chat_id": channel_id, "caption": "telegram compat file"},
+            files={"document": ("telegram.txt", b"telegram-compat", "text/plain")},
+        ).json()
+        _expect(
+            telegram_document["result"]["document"]["file_name"] == "telegram.txt",
+            "Telegram compat document upload failed",
+        )
+
+        discord_message = _request(
+            client,
+            "POST",
+            f"/compat/discord/channels/{channel_id}/messages",
+            200,
+            headers={"Authorization": f"Bot {bearer_token}"},
+            json={"content": "hello from discord compat"},
+        ).json()
+        _expect(discord_message["content"] == "hello from discord compat", "Discord compat message failed")
+
+        discord_attachment = _request(
+            client,
+            "POST",
+            f"/compat/discord/channels/{channel_id}/messages",
+            200,
+            headers={"Authorization": f"Bot {bearer_token}"},
+            data={"content": "discord compat file"},
+            files={"file": ("discord.txt", b"discord-compat", "text/plain")},
+        ).json()
+        _expect(
+            discord_attachment["attachments"][0]["filename"] == "discord.txt",
+            "Discord compat attachment upload failed",
+        )
+
         missing_file = _request(
             client,
             "GET",

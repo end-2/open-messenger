@@ -145,6 +145,18 @@ class MySQLMetadataStore(MetadataStore):
         )
         return self._deserialize_row(row)
 
+    async def get_thread_by_root_message(self, root_message_id: str) -> dict[str, Any] | None:
+        row = await self._run_fetchone(
+            f"""
+            SELECT payload
+            FROM {self._table("threads")}
+            WHERE JSON_UNQUOTE(JSON_EXTRACT(payload, '$.root_message_id'))=%s
+            LIMIT 1
+            """,
+            (root_message_id,),
+        )
+        return self._deserialize_row(row)
+
     async def update_thread(self, thread_id: str, patch: dict[str, Any]) -> dict[str, Any] | None:
         current = await self.get_thread(thread_id)
         if current is None:
@@ -270,6 +282,57 @@ class MySQLMetadataStore(MetadataStore):
         )
         return self._deserialize_row(row)
 
+    async def create_compat_mapping(self, mapping: dict[str, Any]) -> dict[str, Any]:
+        mapping_id = str(mapping["mapping_id"])
+        origin = str(mapping["origin"])
+        entity_type = str(mapping["entity_type"])
+        external_id = str(mapping["external_id"])
+        channel_id = mapping.get("channel_id")
+        record = deepcopy(mapping)
+        await self._run_write(
+            f"""
+            INSERT INTO {self._table("compat_mappings")}
+                (mapping_id, origin, entity_type, channel_id, external_id, payload)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE payload=VALUES(payload), mapping_id=VALUES(mapping_id)
+            """,
+            (mapping_id, origin, entity_type, channel_id, external_id, self._serialize(record)),
+        )
+        return deepcopy(record)
+
+    async def get_compat_mapping(
+        self,
+        origin: str,
+        entity_type: str,
+        external_id: str,
+        channel_id: str | None = None,
+    ) -> dict[str, Any] | None:
+        if channel_id is None:
+            row = await self._run_fetchone(
+                f"""
+                SELECT payload
+                FROM {self._table("compat_mappings")}
+                WHERE origin=%s AND entity_type=%s AND channel_id IS NULL AND external_id=%s
+                LIMIT 1
+                """,
+                (origin, entity_type, external_id),
+            )
+        else:
+            row = await self._run_fetchone(
+                f"""
+                SELECT payload
+                FROM {self._table("compat_mappings")}
+                WHERE origin=%s AND entity_type=%s AND channel_id=%s AND external_id=%s
+                LIMIT 1
+                """,
+                (origin, entity_type, channel_id, external_id),
+            )
+        return self._deserialize_row(row)
+
+    async def next_compat_sequence(self, origin: str, channel_id: str) -> int:
+        await asyncio.to_thread(self._ensure_schema)
+        return await asyncio.to_thread(self._next_compat_sequence_sync, origin, channel_id)
+
     def _initialize(self) -> None:
         for statement in self._schema_statements():
             self._run_write_sync(statement)
@@ -313,6 +376,25 @@ class MySQLMetadataStore(MetadataStore):
             CREATE TABLE IF NOT EXISTS {self._table("files")} (
                 entity_id VARCHAR(128) PRIMARY KEY,
                 payload JSON NOT NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            """,
+            f"""
+            CREATE TABLE IF NOT EXISTS {self._table("compat_mappings")} (
+                mapping_id VARCHAR(128) PRIMARY KEY,
+                origin VARCHAR(32) NOT NULL,
+                entity_type VARCHAR(32) NOT NULL,
+                channel_id VARCHAR(128) NULL,
+                external_id VARCHAR(191) NOT NULL,
+                payload JSON NOT NULL,
+                UNIQUE KEY uniq_{self._table_prefix}_compat_lookup (origin, entity_type, channel_id, external_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            """,
+            f"""
+            CREATE TABLE IF NOT EXISTS {self._table("compat_sequences")} (
+                origin VARCHAR(32) NOT NULL,
+                channel_id VARCHAR(128) NOT NULL,
+                sequence_value BIGINT NOT NULL,
+                PRIMARY KEY (origin, channel_id)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
             """,
         ]
@@ -389,6 +471,24 @@ class MySQLMetadataStore(MetadataStore):
             cursorclass=DictCursor,
             autocommit=False,
         )
+
+    def _next_compat_sequence_sync(self, origin: str, channel_id: str) -> int:
+        with self._connect() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    f"""
+                    INSERT INTO {self._table("compat_sequences")} (origin, channel_id, sequence_value)
+                    VALUES (%s, %s, 1)
+                    ON DUPLICATE KEY UPDATE sequence_value=LAST_INSERT_ID(sequence_value + 1)
+                    """,
+                    (origin, channel_id),
+                )
+                cursor.execute("SELECT LAST_INSERT_ID() AS sequence_value")
+                row = cursor.fetchone()
+            conn.commit()
+        if row is None:
+            raise RuntimeError("Failed to allocate compatibility sequence")
+        return int(row["sequence_value"])
 
     @staticmethod
     def _serialize(payload: dict[str, Any]) -> str:
