@@ -22,6 +22,10 @@ Optional: run with redis/mysql-backed storage:
 Optional: customize file upload storage:
 - `OPEN_MESSENGER_FILES_ROOT_DIR=data/files OPEN_MESSENGER_MAX_UPLOAD_MB=50 make run`
 
+Optional: tighten or disable rate limiting during local runs:
+- `OPEN_MESSENGER_RATE_LIMIT_MAX_REQUESTS=10 OPEN_MESSENGER_RATE_LIMIT_WINDOW_SECONDS=60 make run`
+- `OPEN_MESSENGER_RATE_LIMIT_MAX_REQUESTS=0 make run`
+
 ## Docker Environment
 
 1. Start deployment test stack:

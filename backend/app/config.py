@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     max_upload_mb: int = 50
     admin_api_token: str = "dev-admin-token"
     token_signing_secret: str = "dev-signing-secret"
+    rate_limit_max_requests: int = 60
+    rate_limit_window_seconds: int = 60
 
     model_config = SettingsConfigDict(
         env_file=".env",

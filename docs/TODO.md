@@ -36,7 +36,7 @@
 - [x] 토큰 스코프 검사 구현 (`channels:*`, `messages:*`, `files:*`)
 - [x] 토큰 회전(rotation) API 구현
 - [x] 토큰 폐기(revoke) API 구현
-- [ ] 기본 rate limit 적용
+- [x] 기본 rate limit 적용
 
 ## 5. Native API (`/v1`)
 

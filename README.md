@@ -146,6 +146,8 @@ Errors are standardized as:
 }
 ```
 
+When request volume exceeds the configured window on `/v1` or `/admin/v1`, the API returns `429` with `code=rate_limited` and a `Retry-After` header. The limiter keys by bearer token, admin token, or client IP when no token is present. `/healthz` is excluded.
+
 `/v1/info` reports the configured backend names and selected store implementation classes.
 `memory`, `file`, `redis`, and `mysql` backends are implemented.
 
@@ -162,3 +164,5 @@ Errors are standardized as:
 - `OPEN_MESSENGER_MAX_UPLOAD_MB`: max upload size in MB for `/v1/files`
 - `OPEN_MESSENGER_ADMIN_API_TOKEN`: required value for `X-Admin-Token` on `/admin/v1/*`
 - `OPEN_MESSENGER_TOKEN_SIGNING_SECRET`: signing secret for JWT-like token signature verification
+- `OPEN_MESSENGER_RATE_LIMIT_MAX_REQUESTS`: max requests per identity within the rate limit window
+- `OPEN_MESSENGER_RATE_LIMIT_WINDOW_SECONDS`: sliding window size in seconds for rate limiting
