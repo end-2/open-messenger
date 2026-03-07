@@ -378,12 +378,8 @@ function renderBasePage(title: string, bodyClass: string, content: string): stri
       .message-card.own {
         background: linear-gradient(180deg, rgba(208, 87, 47, 0.16), rgba(255,255,255,0.92));
       }
-      .message-card.own .message-meta,
       .message-card.own .message-actions {
         justify-content: flex-end;
-      }
-      .message-card.own .message-author {
-        flex-direction: row-reverse;
       }
       .message-meta {
         display: flex;

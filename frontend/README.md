@@ -11,7 +11,7 @@ This frontend is a lightweight TypeScript BFF and browser console for the docume
 - Render sender display names in the transcript and thread view when the backend provides them
 - Keep the thread sidebar hidden until a message opens it, with a conventional chat-room style sidebar, transcript, and composer layout
 - Keep the main room transcript focused on root-level room messages while thread replies stay in the thread sidebar, and avoid exposing internal IDs in the room UI
-- Align messages from the current bearer token on the right side like a typical messenger UI, and keep thread actions compact
+- Align messages from the current bearer token on the right side while keeping sender identity at the top-left of each message card, and keep thread actions compact
 - Enter the chat page from the main page after supplying or reusing a saved token, instead of editing the token inside the chat room
 - Validate the token before entering `/chat`, and redirect direct `/chat` visits back to `/` when no valid token is available
 - Subscribe to the backend SSE event stream through the frontend proxy
