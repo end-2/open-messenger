@@ -196,6 +196,77 @@ def test_file_metadata_store_persists_and_paginates(tmp_path) -> None:
     )
 
 
+def test_file_metadata_store_delete_channel_removes_related_records(tmp_path) -> None:
+    db_path = tmp_path / "metadata" / "store.json"
+    store = FileMetadataStore(db_path)
+
+    created_channel = asyncio.run(
+        store.create_channel(
+            {"channel_id": "channel-a", "name": "general", "created_at": "2026-03-03T00:00:00+00:00"}
+        )
+    )
+    asyncio.run(
+        store.create_thread(
+            {
+                "thread_id": "th-1",
+                "channel_id": "channel-a",
+                "root_message_id": "msg-1",
+                "reply_count": 1,
+                "last_message_at": "2026-03-03T00:00:00+00:00",
+                "created_at": "2026-03-03T00:00:00+00:00",
+            }
+        )
+    )
+    asyncio.run(
+        store.create_message(
+            {
+                "message_id": "msg-1",
+                "channel_id": "channel-a",
+                "thread_id": None,
+                "content_ref": "content-1",
+            }
+        )
+    )
+    asyncio.run(
+        store.create_message(
+            {
+                "message_id": "msg-2",
+                "channel_id": "channel-a",
+                "thread_id": "th-1",
+                "content_ref": "content-2",
+            }
+        )
+    )
+    asyncio.run(
+        store.create_compat_mapping(
+            {
+                "mapping_id": "map-1",
+                "origin": "discord",
+                "entity_type": "message",
+                "channel_id": "channel-a",
+                "external_id": "42",
+                "internal_id": "msg-1",
+                "created_at": "2026-03-03T00:00:00+00:00",
+            }
+        )
+    )
+    asyncio.run(store.next_compat_sequence("discord", "channel-a"))
+
+    deleted_channel = asyncio.run(store.delete_channel("channel-a"))
+
+    assert deleted_channel == created_channel
+    reloaded_store = FileMetadataStore(db_path)
+    assert asyncio.run(reloaded_store.get_channel("channel-a")) is None
+    assert asyncio.run(reloaded_store.get_message("msg-1")) is None
+    assert asyncio.run(reloaded_store.get_message("msg-2")) is None
+    assert asyncio.run(reloaded_store.get_thread("th-1")) is None
+    assert (
+        asyncio.run(reloaded_store.get_compat_mapping("discord", "message", "42", "channel-a"))
+        is None
+    )
+    assert asyncio.run(reloaded_store.next_compat_sequence("discord", "channel-a")) == 1
+
+
 async def _chunk_stream(chunks: list[bytes]):
     for chunk in chunks:
         yield chunk

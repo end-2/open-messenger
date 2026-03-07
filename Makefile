@@ -87,8 +87,9 @@ test-docker:
 e2e-docker:
 	@set -euo pipefail; \
 	docker compose up --build -d api redis mysql; \
+	docker compose --profile test build e2e; \
 	trap 'docker compose down --volumes --remove-orphans' EXIT; \
-	docker compose --profile test run --rm --build e2e
+	docker compose --profile test run --rm e2e
 
 test-frontend-docker:
 	docker run --rm -v "$$PWD":/workspace -w /workspace/frontend node:22-alpine npm test

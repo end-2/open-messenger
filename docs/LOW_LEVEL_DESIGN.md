@@ -99,6 +99,7 @@ class MetadataStore(Protocol):
         self, channel_id: str, cursor: str | None, limit: int
     ) -> list[dict]: ...
     async def create_channel(self, channel: dict) -> dict: ...
+    async def delete_channel(self, channel_id: str) -> dict | None: ...
 ```
 
 Expected backend combinations:
@@ -162,6 +163,7 @@ Base path: `/admin/v1`
 Representative endpoints:
 
 - `POST /users`
+- `DELETE /channels/{channel_id}`
 - `POST /tokens`
 - `DELETE /tokens/{token_id}`
 - `POST /tokens/{token_id}/rotate`

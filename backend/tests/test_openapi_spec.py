@@ -20,9 +20,11 @@ def test_openapi_yaml_documents_expected_contract() -> None:
     assert "/v1/messages:batchCreate" in paths
     assert "/compat/slack/chat.postMessage" in paths
     assert "/admin/v1/tokens/{token_id}/rotate" in paths
+    assert "/admin/v1/channels/{channel_id}" in paths
 
     assert paths["/v1/channels"]["post"]["security"] == [{"BearerToken": []}]
     assert paths["/admin/v1/users"]["post"]["security"] == [{"AdminToken": []}]
+    assert paths["/admin/v1/channels/{channel_id}"]["delete"]["security"] == [{"AdminToken": []}]
     assert paths["/compat/slack/chat.postMessage"]["post"]["security"] == [{"BearerToken": []}]
     assert "security" not in paths["/compat/telegram/bot{bot_token}/sendMessage"]["post"]
 

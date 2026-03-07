@@ -44,6 +44,11 @@ class InMemoryMySQLMetadataStore(MySQLMetadataStore):
             entity_id, payload = params
             self._channels[str(entity_id)] = str(payload)
             return 1
+        if "delete from" in normalized and self._table("channels") in normalized:
+            entity_id = str(params[0])
+            existed = entity_id in self._channels
+            self._channels.pop(entity_id, None)
+            return 1 if existed else 0
         if "insert into" in normalized and self._table("threads") in normalized:
             entity_id, payload = params
             self._threads[str(entity_id)] = str(payload)
@@ -54,6 +59,24 @@ class InMemoryMySQLMetadataStore(MySQLMetadataStore):
                 self._threads[str(entity_id)] = str(payload)
                 return 1
             return 0
+        if "delete from" in normalized and self._table("threads") in normalized:
+            if "root_message_id" in normalized:
+                root_message_id = str(params[0])
+                thread_ids = [
+                    thread_id
+                    for thread_id, payload in self._threads.items()
+                    if str(json.loads(payload).get("root_message_id")) == root_message_id
+                ]
+            else:
+                channel_id = str(params[0])
+                thread_ids = [
+                    thread_id
+                    for thread_id, payload in self._threads.items()
+                    if str(json.loads(payload).get("channel_id")) == channel_id
+                ]
+            for thread_id in thread_ids:
+                self._threads.pop(thread_id, None)
+            return len(thread_ids)
         if "insert into" in normalized and self._table("messages") in normalized:
             message_id, channel_id, payload = params
             existing = self._messages.get(str(message_id))
@@ -69,6 +92,16 @@ class InMemoryMySQLMetadataStore(MySQLMetadataStore):
                 existing["channel_id"] = str(channel_id)
                 existing["payload"] = str(payload)
             return 1
+        if "delete from" in normalized and self._table("messages") in normalized:
+            channel_id = str(params[0])
+            message_ids = [
+                message_id
+                for message_id, row in self._messages.items()
+                if str(row["channel_id"]) == channel_id
+            ]
+            for message_id in message_ids:
+                self._messages.pop(message_id, None)
+            return len(message_ids)
         if "insert into" in normalized and self._table("files") in normalized:
             entity_id, payload = params
             self._files[str(entity_id)] = str(payload)
@@ -80,6 +113,18 @@ class InMemoryMySQLMetadataStore(MySQLMetadataStore):
                 payload
             )
             return 1
+        if "delete from" in normalized and self._table("compat_mappings") in normalized:
+            channel_id = str(params[0])
+            mapping_keys = [key for key in self._compat_mappings if key[2] == channel_id]
+            for key in mapping_keys:
+                self._compat_mappings.pop(key, None)
+            return len(mapping_keys)
+        if "delete from" in normalized and self._table("compat_sequences") in normalized:
+            channel_id = str(params[0])
+            sequence_keys = [key for key in self._compat_sequences if key[1] == channel_id]
+            for key in sequence_keys:
+                self._compat_sequences.pop(key, None)
+            return len(sequence_keys)
         return 0
 
     def _run_fetchone_sync(self, sql: str, params=()):
@@ -192,6 +237,13 @@ class InMemoryMySQLMetadataStore(MySQLMetadataStore):
                 if str(row["channel_id"]) == channel_id and int(row["sequence_id"]) > sequence_id
             ]
             return selected[:limit]
+        if len(params) == 1:
+            channel_id = str(params[0])
+            return [
+                {"payload": row["payload"]}
+                for row in ordered
+                if str(row["channel_id"]) == channel_id
+            ]
 
         channel_id = str(params[0])
         limit = int(params[1])
@@ -406,3 +458,72 @@ def test_mysql_idempotency_query_treats_json_null_thread_as_match() -> None:
     normalized = " ".join(store.last_sql.lower().split())
     assert "json_type(json_extract(payload, '$.thread_id'))='null'" in normalized
     assert store.last_params == ("channel-a", "req-1", None, None)
+
+
+def test_mysql_metadata_store_delete_channel_removes_related_records() -> None:
+    store = InMemoryMySQLMetadataStore()
+
+    created_channel = asyncio.run(
+        store.create_channel(
+            {"channel_id": "channel-a", "name": "general", "created_at": "2026-03-03T00:00:00Z"}
+        )
+    )
+    asyncio.run(
+        store.create_thread(
+            {
+                "thread_id": "th-1",
+                "channel_id": "channel-a",
+                "root_message_id": "msg-1",
+                "reply_count": 1,
+                "last_message_at": "2026-03-03T00:00:00Z",
+                "created_at": "2026-03-03T00:00:00Z",
+            }
+        )
+    )
+    asyncio.run(
+        store.create_message(
+            {
+                "message_id": "msg-1",
+                "channel_id": "channel-a",
+                "thread_id": None,
+                "content_ref": "content-1",
+            }
+        )
+    )
+    asyncio.run(
+        store.create_message(
+            {
+                "message_id": "msg-2",
+                "channel_id": "channel-a",
+                "thread_id": "th-1",
+                "content_ref": "content-2",
+            }
+        )
+    )
+    asyncio.run(
+        store.create_compat_mapping(
+            {
+                "mapping_id": "map-1",
+                "origin": "slack",
+                "entity_type": "message",
+                "channel_id": "channel-a",
+                "external_id": "123.000001",
+                "internal_id": "msg-1",
+                "created_at": "2026-03-03T00:00:00Z",
+            }
+        )
+    )
+    asyncio.run(store.next_compat_sequence("slack", "channel-a"))
+
+    deleted_channel = asyncio.run(store.delete_channel("channel-a"))
+
+    assert deleted_channel == created_channel
+    assert asyncio.run(store.get_channel("channel-a")) is None
+    assert asyncio.run(store.get_message("msg-1")) is None
+    assert asyncio.run(store.get_message("msg-2")) is None
+    assert asyncio.run(store.get_thread("th-1")) is None
+    assert (
+        asyncio.run(store.get_compat_mapping("slack", "message", "123.000001", "channel-a"))
+        is None
+    )
+    assert asyncio.run(store.next_compat_sequence("slack", "channel-a")) == 1

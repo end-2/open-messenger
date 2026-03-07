@@ -178,11 +178,13 @@ def test_admin_api_requires_admin_token_header() -> None:
     )
     rotate_response = client.post("/admin/v1/tokens/tok_missing/rotate")
     revoke_response = client.delete("/admin/v1/tokens/tok_missing")
+    delete_channel_response = client.delete("/admin/v1/channels/ch_missing")
 
     assert create_user_response.status_code == 403
     assert create_token_response.status_code == 403
     assert rotate_response.status_code == 403
     assert revoke_response.status_code == 403
+    assert delete_channel_response.status_code == 403
 
 
 def test_admin_api_rejects_invalid_admin_token() -> None:
@@ -350,3 +352,77 @@ def test_rotated_token_invalidates_old_plaintext_token_for_native_api() -> None:
 
     assert denied.status_code == 401
     assert allowed.status_code == 201
+
+
+def test_delete_channel_removes_channel_messages_threads_and_content() -> None:
+    client = TestClient(create_app())
+    user = _create_user(client, username="channel-admin-user")
+
+    token_response = client.post(
+        "/admin/v1/tokens",
+        json={
+            "user_id": user["user_id"],
+            "token_type": "user_token",
+            "scopes": ["channels:read", "channels:write", "messages:write", "messages:read"],
+        },
+        headers=_admin_headers(),
+    )
+    assert token_response.status_code == 201
+    headers = {"Authorization": f"Bearer {token_response.json()['token']}"}
+
+    channel_response = client.post("/v1/channels", json={"name": "ops"}, headers=headers)
+    assert channel_response.status_code == 201
+    channel_id = channel_response.json()["channel_id"]
+
+    root_response = client.post(
+        f"/v1/channels/{channel_id}/messages",
+        json={"text": "root"},
+        headers=headers,
+    )
+    assert root_response.status_code == 201
+    root_payload = root_response.json()
+
+    thread_response = client.post(
+        f"/v1/channels/{channel_id}/threads",
+        json={"root_message_id": root_payload["message_id"]},
+        headers=headers,
+    )
+    assert thread_response.status_code == 201
+    thread_id = thread_response.json()["thread_id"]
+
+    reply_response = client.post(
+        f"/v1/channels/{channel_id}/messages",
+        json={"text": "reply", "thread_id": thread_id},
+        headers=headers,
+    )
+    assert reply_response.status_code == 201
+    reply_payload = reply_response.json()
+
+    root_record = asyncio.run(client.app.state.metadata_store.get_message(root_payload["message_id"]))
+    reply_record = asyncio.run(client.app.state.metadata_store.get_message(reply_payload["message_id"]))
+    assert root_record is not None
+    assert reply_record is not None
+
+    delete_response = client.delete(f"/admin/v1/channels/{channel_id}", headers=_admin_headers())
+    assert delete_response.status_code == 204
+
+    assert asyncio.run(client.app.state.metadata_store.get_channel(channel_id)) is None
+    assert asyncio.run(client.app.state.metadata_store.get_message(root_payload["message_id"])) is None
+    assert asyncio.run(client.app.state.metadata_store.get_message(reply_payload["message_id"])) is None
+    assert asyncio.run(client.app.state.metadata_store.get_thread(thread_id)) is None
+    assert asyncio.run(client.app.state.metadata_store.get_thread_by_root_message(root_payload["message_id"])) is None
+    assert asyncio.run(client.app.state.content_store.get(root_record["content_ref"])) is None
+    assert asyncio.run(client.app.state.content_store.get(reply_record["content_ref"])) is None
+
+    get_response = client.get(f"/v1/channels/{channel_id}", headers=headers)
+    list_response = client.get(f"/v1/channels/{channel_id}/messages", headers=headers)
+    assert get_response.status_code == 404
+    assert list_response.status_code == 404
+
+
+def test_delete_channel_fails_for_missing_channel() -> None:
+    client = TestClient(create_app())
+
+    response = client.delete("/admin/v1/channels/ch_missing", headers=_admin_headers())
+
+    assert response.status_code == 404

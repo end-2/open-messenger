@@ -125,6 +125,54 @@ class MySQLMetadataStore(MetadataStore):
         )
         return self._deserialize_row(row)
 
+    async def delete_channel(self, channel_id: str) -> dict[str, Any] | None:
+        channel = await self.get_channel(channel_id)
+        if channel is None:
+            return None
+
+        message_rows = await self._run_fetchall(
+            f"SELECT payload FROM {self._table('messages')} WHERE channel_id=%s",
+            (channel_id,),
+        )
+        root_message_ids: list[str] = []
+        for row in message_rows:
+            payload = self._deserialize_row(row)
+            if payload is None:
+                continue
+            if payload.get("thread_id") is None:
+                root_message_ids.append(str(payload["message_id"]))
+
+        for root_message_id in root_message_ids:
+            await self._run_write(
+                f"""
+                DELETE FROM {self._table("threads")}
+                WHERE JSON_UNQUOTE(JSON_EXTRACT(payload, '$.root_message_id'))=%s
+                """,
+                (root_message_id,),
+            )
+
+        await self._run_write(
+            f"DELETE FROM {self._table('threads')} WHERE JSON_UNQUOTE(JSON_EXTRACT(payload, '$.channel_id'))=%s",
+            (channel_id,),
+        )
+        await self._run_write(
+            f"DELETE FROM {self._table('messages')} WHERE channel_id=%s",
+            (channel_id,),
+        )
+        await self._run_write(
+            f"DELETE FROM {self._table('compat_mappings')} WHERE channel_id=%s",
+            (channel_id,),
+        )
+        await self._run_write(
+            f"DELETE FROM {self._table('compat_sequences')} WHERE channel_id=%s",
+            (channel_id,),
+        )
+        await self._run_write(
+            f"DELETE FROM {self._table('channels')} WHERE entity_id=%s",
+            (channel_id,),
+        )
+        return channel
+
     async def create_thread(self, thread: dict[str, Any]) -> dict[str, Any]:
         thread_id = str(thread["thread_id"])
         record = deepcopy(thread)

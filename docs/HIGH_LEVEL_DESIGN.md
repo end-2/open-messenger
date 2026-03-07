@@ -81,7 +81,7 @@ The frontend provides a browser console for service inspection, token bootstrap,
 The backend is built with FastAPI and exposes:
 
 - `/v1` for the native API
-- `/admin/v1` for administrative token and user management
+- `/admin/v1` for administrative user, token, and channel lifecycle management
 - `/compat/*` for compatibility endpoints
 - `/v1/events/*` for realtime streaming
 

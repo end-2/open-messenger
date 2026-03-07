@@ -83,6 +83,42 @@ class InMemoryMetadataStore(MetadataStore):
             return None
         return deepcopy(channel)
 
+    async def delete_channel(self, channel_id: str) -> dict[str, Any] | None:
+        channel = self._channels.pop(channel_id, None)
+        if channel is None:
+            return None
+
+        message_ids = self._channel_index.pop(channel_id, [])
+        message_id_set = set(message_ids)
+        for message_id in message_ids:
+            self._messages.pop(message_id, None)
+
+        thread_ids_to_delete = [
+            thread_id
+            for thread_id, record in self._threads.items()
+            if str(record.get("channel_id")) == channel_id
+        ]
+        for thread_id in thread_ids_to_delete:
+            self._threads.pop(thread_id, None)
+
+        mapping_keys_to_delete = [
+            key for key in self._compat_mappings if key[2] == channel_id
+        ]
+        for key in mapping_keys_to_delete:
+            self._compat_mappings.pop(key, None)
+
+        sequence_keys_to_delete = [
+            key for key in self._compat_sequences if key[1] == channel_id
+        ]
+        for key in sequence_keys_to_delete:
+            self._compat_sequences.pop(key, None)
+
+        for thread_id, record in list(self._threads.items()):
+            if str(record.get("root_message_id")) in message_id_set:
+                self._threads.pop(thread_id, None)
+
+        return deepcopy(channel)
+
     async def create_thread(self, thread: dict[str, Any]) -> dict[str, Any]:
         thread_id = str(thread["thread_id"])
         record = deepcopy(thread)

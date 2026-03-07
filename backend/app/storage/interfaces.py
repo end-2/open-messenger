@@ -41,6 +41,9 @@ class MetadataStore(Protocol):
     async def get_channel(self, channel_id: str) -> dict[str, Any] | None:
         ...
 
+    async def delete_channel(self, channel_id: str) -> dict[str, Any] | None:
+        ...
+
     async def create_thread(self, thread: dict[str, Any]) -> dict[str, Any]:
         ...
 

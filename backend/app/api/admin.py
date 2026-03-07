@@ -8,11 +8,34 @@ from app.config import Settings, get_settings
 from app.domain import User
 from app.errors import api_error
 
-from .helpers import audit_logger, issue_admin_token, new_id, require_admin_access, utc_now_iso
+from .helpers import (
+    audit_logger,
+    get_channel_or_404,
+    issue_admin_token,
+    new_id,
+    require_admin_access,
+    utc_now_iso,
+)
 from .schemas import CreateTokenRequest, CreateTokenResponse, CreateUserRequest, UserResponse
 
 
 router = APIRouter()
+
+
+async def _collect_channel_content_refs(metadata_store: Any, channel_id: str) -> set[str]:
+    cursor: str | None = None
+    content_refs: set[str] = set()
+
+    while True:
+        page = await metadata_store.list_channel_messages(channel_id, cursor=cursor, limit=200)
+        if not page:
+            break
+        content_refs.update(str(message["content_ref"]) for message in page)
+        cursor = str(page[-1]["message_id"])
+        if len(page) < 200:
+            break
+
+    return content_refs
 
 
 @router.post(
@@ -136,4 +159,26 @@ async def revoke_admin_token(
     else:
         audit_logger.info("admin_token_revoke_noop token_id=%s", token_id)
 
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.delete(
+    "/admin/v1/channels/{channel_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_admin_channel(
+    channel_id: str,
+    request: Request,
+    _: None = Depends(require_admin_access),
+) -> Response:
+    metadata_store = request.app.state.metadata_store
+    content_store = request.app.state.content_store
+
+    await get_channel_or_404(metadata_store, channel_id)
+    content_refs = await _collect_channel_content_refs(metadata_store, channel_id)
+    await metadata_store.delete_channel(channel_id)
+    for content_ref in content_refs:
+        await content_store.delete(content_ref)
+
+    audit_logger.info("admin_channel_deleted channel_id=%s deleted_content_refs=%s", channel_id, len(content_refs))
     return Response(status_code=status.HTTP_204_NO_CONTENT)

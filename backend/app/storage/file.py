@@ -122,6 +122,46 @@ class FileMetadataStore(MetadataStore):
             return None
         return deepcopy(record)
 
+    async def delete_channel(self, channel_id: str) -> dict[str, Any] | None:
+        with self._lock:
+            database = self._read_database()
+            channel = database["channels"].pop(channel_id, None)
+            if channel is None:
+                return None
+
+            message_ids = database["channel_index"].pop(channel_id, [])
+            message_id_set = set(message_ids)
+            for message_id in message_ids:
+                database["messages"].pop(message_id, None)
+
+            thread_ids_to_delete = [
+                thread_id
+                for thread_id, record in database["threads"].items()
+                if str(record.get("channel_id")) == channel_id
+                or str(record.get("root_message_id")) in message_id_set
+            ]
+            for thread_id in thread_ids_to_delete:
+                database["threads"].pop(thread_id, None)
+
+            compat_keys_to_delete = [
+                key
+                for key, record in database["compat_mappings"].items()
+                if record.get("channel_id") == channel_id
+            ]
+            for key in compat_keys_to_delete:
+                database["compat_mappings"].pop(key, None)
+
+            sequence_keys_to_delete = [
+                key
+                for key in database["compat_sequences"]
+                if key.endswith(f":{channel_id}")
+            ]
+            for key in sequence_keys_to_delete:
+                database["compat_sequences"].pop(key, None)
+
+            self._write_database(database)
+        return deepcopy(channel)
+
     async def create_thread(self, thread: dict[str, Any]) -> dict[str, Any]:
         thread_id = str(thread["thread_id"])
         record = deepcopy(thread)
