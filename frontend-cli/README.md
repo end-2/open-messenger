@@ -10,6 +10,16 @@ npm install
 npm run dev
 ```
 
+## Build a binary
+
+From the repository root:
+
+```bash
+make build
+```
+
+The Docker-based build writes a Linux x64 executable to `frontend-cli/build/open-messenger-cli`.
+
 Optional environment variables:
 
 - `OPEN_MESSENGER_API_URL` defaults to `http://127.0.0.1:8000`

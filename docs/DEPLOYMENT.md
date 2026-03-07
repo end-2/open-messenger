@@ -22,6 +22,7 @@ Frontend workflows:
 - Run frontend unit tests locally with `cd frontend && npm test`.
 - Run the interactive CLI locally with `cd frontend-cli && npm install && npm run dev`.
 - Run frontend CLI unit tests locally with `cd frontend-cli && npm test`.
+- Build the frontend CLI binary with `make build`. The Docker build writes the Linux x64 binary `frontend-cli/build/open-messenger-cli`.
 
 Optional runtime overrides:
 

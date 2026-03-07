@@ -65,6 +65,14 @@ npm run dev
 
 Useful commands inside the CLI include `bootstrap`, `create-channel`, `use-channel`, `list`, `send`, `thread`, `reply`, and `context`.
 
+Build the CLI binary in Docker:
+
+```bash
+make build
+```
+
+The Docker build writes a Linux x64 binary to `frontend-cli/build/open-messenger-cli`.
+
 The matrix E2E runner provisions multiple users with different scope sets, creates several channels, sends cross-user messages and thread replies, then validates fetched transcripts and thread contexts against embedded expected-answer fixtures.
 
 ## Basic API Example

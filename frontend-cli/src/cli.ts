@@ -289,7 +289,3 @@ export async function runCli(args: string[] = process.argv.slice(2)): Promise<vo
     rl.close();
   }
 }
-
-if (import.meta.url === new URL(process.argv[1] ?? "", "file:").href) {
-  void runCli();
-}

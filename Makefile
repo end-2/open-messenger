@@ -5,13 +5,14 @@ PIP := $(VENV_DIR)/bin/pip
 PYTEST := $(VENV_DIR)/bin/pytest
 UVICORN := $(VENV_DIR)/bin/uvicorn
 
-.PHONY: help venv install run test e2e e2e-matrix test-docker e2e-docker e2e-matrix-docker test-frontend-docker test-frontend-cli-docker up down fullstack-up fullstack-down deploy-single-config deploy-staging-config deploy-prod-config clean
+.PHONY: help venv install run build test e2e e2e-matrix test-docker e2e-docker e2e-matrix-docker test-frontend-docker test-frontend-cli-docker up down fullstack-up fullstack-down deploy-single-config deploy-staging-config deploy-prod-config clean
 
 help:
 	@echo "Available targets:"
 	@echo "  venv         Create local virtual environment"
 	@echo "  install      Install Python dependencies in venv"
 	@echo "  run          Run API server locally"
+	@echo "  build        Build the frontend CLI binary in Docker"
 	@echo "  test         Run unit tests in local venv"
 	@echo "  e2e          Run end-to-end API checks locally (starts temporary API server)"
 	@echo "  e2e-matrix   Run multi-user end-to-end matrix locally (starts temporary API server)"
@@ -38,6 +39,10 @@ install: venv
 
 run: install
 	PYTHONPATH=backend $(UVICORN) app.main:app --host 0.0.0.0 --port 8000 --reload
+
+build:
+	mkdir -p frontend-cli/build
+	docker run --rm -v "$$PWD":/workspace -w /workspace/frontend-cli node:22-alpine sh -lc "npm install --no-save --no-package-lock esbuild@0.25.10 pkg@5.8.1 && npx esbuild src/cli-main.ts --bundle --platform=node --target=node18 --format=cjs --outfile=build/cli.cjs && npx pkg build/cli.cjs --targets node18-linux-x64 --output build/open-messenger-cli && rm -rf node_modules build/cli.cjs"
 
 test: install
 	PYTHONPATH=backend $(PYTEST) -q backend/tests
