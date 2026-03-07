@@ -10,6 +10,7 @@ This frontend is a lightweight TypeScript BFF and browser console for the docume
 - Load channel messages
 - Render sender display names in the transcript and thread view when the backend provides them
 - Keep the thread sidebar hidden until a message opens it, with a conventional chat-room style sidebar, transcript, and composer layout
+- Keep the main room transcript focused on root-level room messages while thread replies stay in the thread sidebar, and avoid exposing internal IDs in the room UI
 - Subscribe to the backend SSE event stream through the frontend proxy
 
 ## Run

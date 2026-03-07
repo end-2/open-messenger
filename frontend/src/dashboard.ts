@@ -782,6 +782,9 @@ export function renderChatPage(): string {
       function formatSenderLabel(message) {
         return message?.sender_display_name || message?.sender_username || message?.sender_user_id || "unknown sender";
       }
+      function formatIdentityLabel(identity) {
+        return identity?.user?.display_name || identity?.user?.username || "Unknown user";
+      }
       function formatSenderInitial(message) {
         const label = formatSenderLabel(message).trim();
         return label ? label.charAt(0).toUpperCase() : "?";
@@ -833,7 +836,6 @@ export function renderChatPage(): string {
           item.style.cursor = "pointer";
           item.innerHTML = [
             "<strong># " + escapeClientHtml(channel.name) + "</strong>",
-            "<div class='mono hint'>" + escapeClientHtml(channel.channel_id) + "</div>",
             "<div class='hint'>Created " + escapeClientHtml(formatTimestamp(channel.created_at)) + "</div>"
           ].join("");
           item.addEventListener("click", () => {
@@ -848,18 +850,19 @@ export function renderChatPage(): string {
         activeThread = null;
         channelIdInput.value = channel.channel_id;
         activeChannelName.textContent = "# " + channel.name;
-        activeChannelId.textContent = channel.channel_id;
+        activeChannelId.textContent = "Open the room to read messages and start threads.";
         renderChannelList();
         renderThreadPanel();
         toggleThreadSidebar(false);
       }
       function renderMessages(items) {
         messageList.innerHTML = "";
-        if (!items.length) {
+        const roomMessages = items.filter((item) => !item.thread_id);
+        if (!roomMessages.length) {
           messageList.innerHTML = "<article class='panel' style='padding:16px; background:var(--panel-strong);'><strong>No messages yet.</strong><p class='hint' style='margin-bottom:0;'>Send the first message to this room.</p></article>";
           return;
         }
-        for (const item of items) {
+        for (const item of roomMessages) {
           const bubble = document.createElement("article");
           bubble.className = "message-card";
           const threadButtonLabel = item.thread_id ? "Open thread" : "Start thread";
@@ -908,7 +911,6 @@ export function renderChatPage(): string {
           "<span class='pill'>root</span>",
           "</div>",
           "<p class='preformatted' style='color:var(--text); margin:12px 0 10px;'>" + escapeClientHtml(rootMessage.text) + "</p>",
-          "<div class='mono hint break-anywhere'>" + escapeClientHtml(context.thread.thread_id) + "</div>",
           "<div class='hint' style='margin-top:8px;'>" + String(context.thread.reply_count) + " replies, last activity " + escapeClientHtml(formatTimestamp(context.thread.last_message_at)) + "</div>",
           "</article>"
         ];
@@ -924,7 +926,6 @@ export function renderChatPage(): string {
               "<time class='hint'>" + escapeClientHtml(formatTimestamp(reply.created_at)) + "</time>",
               "</div>",
               "<p class='preformatted' style='color:var(--text); margin:12px 0 10px;'>" + escapeClientHtml(reply.text) + "</p>",
-              "<div class='mono hint break-anywhere'>" + escapeClientHtml(reply.message_id) + "</div>",
               "</article>"
             ].join(""));
           }
@@ -1017,9 +1018,8 @@ export function renderChatPage(): string {
         const tokenFromUrl = params.get("access_token");
         const storedIdentity = readStoredIdentity();
         const storedToken = typeof storedIdentity?.token?.token === "string" ? storedIdentity.token.token : "";
-        const storedUserId = typeof storedIdentity?.user?.user_id === "string" ? storedIdentity.user.user_id : "";
         accessTokenInput.value = tokenFromUrl || storedToken;
-        sessionUserId.textContent = storedUserId || "Unknown user";
+        sessionUserId.textContent = formatIdentityLabel(storedIdentity);
         if (accessTokenInput.value) {
           setStatus(sessionStatus, "Session restored from saved identity.", true);
         }
