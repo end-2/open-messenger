@@ -134,9 +134,14 @@ Request patterns:
 
 Token properties:
 
-- JWT-like structure signed with `HMAC-SHA256`
+- JWT-like structure signed with configurable HMAC algorithms: `HS256`, `HS384`, or `HS512`
 - Stored as hashes, not plaintext
 - Scoped with values such as `channels:read`, `channels:write`, `messages:read`, `messages:write`, and `files:write`
+
+Default token signing algorithm:
+
+- `HS256`
+- Chosen as the default because it keeps token size smallest while remaining in the same performance band as the other supported HMAC variants in the project benchmark.
 
 ## HTTP API Design
 

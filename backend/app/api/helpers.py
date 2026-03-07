@@ -513,7 +513,11 @@ async def issue_admin_token(
         "scopes": scopes,
         "iat": now,
     }
-    plain_token = create_jwt_like_token(token_payload, settings.token_signing_secret)
+    plain_token = create_jwt_like_token(
+        token_payload,
+        settings.token_signing_secret,
+        settings.token_signing_algorithm,
+    )
     token_record["token_hash"] = sha256_hexdigest(plain_token)
 
     stored = await metadata_store.create_token(token_record)

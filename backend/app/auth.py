@@ -5,7 +5,7 @@ import hashlib
 import hmac
 import json
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Callable
 
 from fastapi import Depends, HTTPException, Request, status
 
@@ -21,6 +21,13 @@ class AuthContext:
     raw_token: str
 
 
+SUPPORTED_TOKEN_ALGORITHMS: dict[str, Callable[[], Any]] = {
+    "HS256": hashlib.sha256,
+    "HS384": hashlib.sha384,
+    "HS512": hashlib.sha512,
+}
+
+
 def _b64url_encode(raw: bytes) -> str:
     return base64.urlsafe_b64encode(raw).decode("utf-8").rstrip("=")
 
@@ -34,8 +41,16 @@ def sha256_hexdigest(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
-def create_jwt_like_token(payload: dict[str, Any], signing_secret: str) -> str:
-    header = {"alg": "HS256", "typ": "JWT-LIKE"}
+def create_jwt_like_token(
+    payload: dict[str, Any],
+    signing_secret: str,
+    algorithm: str = "HS256",
+) -> str:
+    digestmod = SUPPORTED_TOKEN_ALGORITHMS.get(algorithm)
+    if digestmod is None:
+        raise ValueError(f"Unsupported token algorithm: {algorithm}")
+
+    header = {"alg": algorithm, "typ": "JWT-LIKE"}
     header_part = _b64url_encode(
         json.dumps(header, ensure_ascii=True, separators=(",", ":")).encode("utf-8")
     )
@@ -46,35 +61,42 @@ def create_jwt_like_token(payload: dict[str, Any], signing_secret: str) -> str:
     signature = hmac.new(
         signing_secret.encode("utf-8"),
         signing_input,
-        digestmod=hashlib.sha256,
+        digestmod=digestmod,
     ).digest()
     signature_part = _b64url_encode(signature)
     return f"{header_part}.{payload_part}.{signature_part}"
 
 
-def decode_and_verify_jwt_like_token(token: str, signing_secret: str) -> dict[str, Any]:
+def decode_and_verify_jwt_like_token(
+    token: str,
+    signing_secret: str,
+    algorithm: str = "HS256",
+) -> dict[str, Any]:
+    expected_digestmod = SUPPORTED_TOKEN_ALGORITHMS.get(algorithm)
+    if expected_digestmod is None:
+        raise ValueError(f"Unsupported token algorithm: {algorithm}")
+
     parts = token.split(".")
     if len(parts) != 3:
         raise ValueError("Invalid token format")
 
     header_part, payload_part, signature_part = parts
+    header = json.loads(_b64url_decode(header_part))
+    if header.get("alg") != algorithm or header.get("typ") != "JWT-LIKE":
+        raise ValueError("Unsupported token header")
 
     signing_input = f"{header_part}.{payload_part}".encode("utf-8")
     expected_signature = hmac.new(
         signing_secret.encode("utf-8"),
         signing_input,
-        digestmod=hashlib.sha256,
+        digestmod=expected_digestmod,
     ).digest()
     presented_signature = _b64url_decode(signature_part)
 
     if not hmac.compare_digest(expected_signature, presented_signature):
         raise ValueError("Invalid token signature")
 
-    header = json.loads(_b64url_decode(header_part))
     payload = json.loads(_b64url_decode(payload_part))
-
-    if header.get("alg") != "HS256" or header.get("typ") != "JWT-LIKE":
-        raise ValueError("Unsupported token header")
 
     if not isinstance(payload, dict):
         raise ValueError("Invalid token payload")
@@ -119,7 +141,11 @@ async def authenticate_raw_token(
     settings: Settings,
 ) -> AuthContext:
     try:
-        payload = decode_and_verify_jwt_like_token(raw_token, settings.token_signing_secret)
+        payload = decode_and_verify_jwt_like_token(
+            raw_token,
+            settings.token_signing_secret,
+            settings.token_signing_algorithm,
+        )
     except ValueError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

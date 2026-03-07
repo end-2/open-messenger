@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     max_upload_mb: int = 50
     admin_api_token: str = "dev-admin-token"
     token_signing_secret: str = "dev-signing-secret"
+    token_signing_algorithm: Literal["HS256", "HS384", "HS512"] = "HS256"
     rate_limit_max_requests: int = 60
     rate_limit_window_seconds: int = 60
     tracing_enabled: bool = False

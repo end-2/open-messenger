@@ -170,6 +170,13 @@ Storage read-path benchmark:
 
 The benchmark seeds a channel, creates root and threaded messages, and reports average, p50, p95, and max latency for `GET /v1/channels/{channel_id}/messages`, `POST /v1/messages:batchGet`, and `GET /v1/threads/{thread_id}/context`.
 
+Token signing algorithm benchmark:
+
+- Local `venv`: `PYTHONPATH=backend .venv/bin/python scripts/bench_auth_algorithms.py`
+- Optional iterations override: `PYTHONPATH=backend .venv/bin/python scripts/bench_auth_algorithms.py --iterations 20000 --warmup 2000`
+
+The benchmark compares signing cost, verification cost, combined cost, and token size for `HS256`, `HS384`, and `HS512`. The default runtime setting remains `HS256` because it keeps tokens smallest while staying in the same performance band, and you can override it with `OPEN_MESSENGER_TOKEN_SIGNING_ALGORITHM`.
+
 ## Make Targets
 
 - `make fullstack-up`: start frontend, API, Redis, MySQL, and Tempo in Docker

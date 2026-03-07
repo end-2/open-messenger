@@ -90,7 +90,7 @@ Each template includes:
 - storage backend selections
 - file storage settings
 - Redis and MySQL connection settings
-- admin and token signing secrets
+- admin token, token signing secret, and token signing algorithm
 - rate limit configuration
 - OTLP tracing configuration
 - Grafana credentials
@@ -199,6 +199,7 @@ Credential rotation:
 
 - `OPEN_MESSENGER_ADMIN_API_TOKEN`
 - `OPEN_MESSENGER_TOKEN_SIGNING_SECRET`
+- `OPEN_MESSENGER_TOKEN_SIGNING_ALGORITHM`
 - MySQL credentials when used
 - Redis credentials when used
 

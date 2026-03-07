@@ -2,9 +2,10 @@ import asyncio
 import hashlib
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
-from app.auth import decode_and_verify_jwt_like_token
+from app.auth import create_jwt_like_token, decode_and_verify_jwt_like_token
 from app.main import create_app
 from app.utils import is_valid_prefixed_ulid, parse_iso8601_utc
 
@@ -218,6 +219,26 @@ def test_admin_api_uses_configured_admin_token(monkeypatch) -> None:
     assert allowed.status_code == 201
 
 
+def test_admin_api_issues_tokens_with_configured_signing_algorithm(monkeypatch) -> None:
+    monkeypatch.setenv("OPEN_MESSENGER_TOKEN_SIGNING_ALGORITHM", "HS512")
+    client = TestClient(create_app())
+    user = _create_user(client, username="alg-user")
+
+    token_response = client.post(
+        "/admin/v1/tokens",
+        json={"user_id": user["user_id"], "token_type": "user_token", "scopes": ["channels:read"]},
+        headers=_admin_headers(),
+    )
+
+    assert token_response.status_code == 201
+    decoded_token = decode_and_verify_jwt_like_token(
+        token_response.json()["token"],
+        "dev-signing-secret",
+        "HS512",
+    )
+    assert decoded_token["sub"] == user["user_id"]
+
+
 def test_v1_does_not_allow_user_or_token_creation() -> None:
     client = TestClient(create_app())
 
@@ -319,6 +340,55 @@ def test_revoked_token_can_no_longer_access_native_api() -> None:
 
     denied = client.post("/v1/channels", json={"name": "denied"}, headers=headers)
     assert denied.status_code == 401
+
+
+def test_token_signed_with_different_secret_is_rejected_by_native_api() -> None:
+    client = TestClient(create_app())
+    user = _create_user(client, username="wrong-secret-user")
+
+    token_response = client.post(
+        "/admin/v1/tokens",
+        json={
+            "user_id": user["user_id"],
+            "token_type": "user_token",
+            "scopes": ["channels:write"],
+        },
+        headers=_admin_headers(),
+    )
+    assert token_response.status_code == 201
+    token_payload = token_response.json()
+
+    forged_token = create_jwt_like_token(
+        {
+            "tid": token_payload["token_id"],
+            "sub": user["user_id"],
+            "token_type": "user_token",
+            "scopes": ["channels:write"],
+            "iat": token_payload["created_at"],
+        },
+        "different-signing-secret",
+        "HS256",
+    )
+
+    response = client.post(
+        "/v1/channels",
+        json={"name": "forged"},
+        headers={"Authorization": f"Bearer {forged_token}"},
+    )
+
+    assert response.status_code == 401
+    payload = response.json()
+    assert payload.get("detail") == "Invalid bearer token" or payload.get("code") == "unauthorized"
+
+
+@pytest.mark.parametrize("algorithm", ["HS256", "HS384", "HS512"])
+def test_supported_token_algorithms_roundtrip(algorithm: str) -> None:
+    payload = {"tid": "tok-1", "sub": "usr-1", "token_type": "user_token", "scopes": []}
+
+    token = create_jwt_like_token(payload, "test-secret", algorithm)
+    decoded = decode_and_verify_jwt_like_token(token, "test-secret", algorithm)
+
+    assert decoded == payload
 
 
 def test_rotated_token_invalidates_old_plaintext_token_for_native_api() -> None:
