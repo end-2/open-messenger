@@ -3,7 +3,7 @@ import { pathToFileURL } from "node:url";
 
 import { BackendClient, BackendError } from "./backend.ts";
 import { getFrontendConfig } from "./config.ts";
-import { renderDashboard } from "./dashboard.ts";
+import { renderChatPage, renderHomePage } from "./dashboard.ts";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -29,7 +29,7 @@ async function readJson(request: IncomingMessage): Promise<JsonRecord> {
   return JSON.parse(Buffer.concat(chunks).toString("utf8")) as JsonRecord;
 }
 
-export function createFrontendServer(client: BackendClient, html: string) {
+export function createFrontendServer(client: BackendClient, pages: { home: string; chat: string }) {
   return createServer(async (request, response) => {
     if (!request.url) {
       sendJson(response, 400, { error: "Request URL is required" });
@@ -45,7 +45,12 @@ export function createFrontendServer(client: BackendClient, html: string) {
       }
 
       if (request.method === "GET" && url.pathname === "/") {
-        send(response, 200, html, "text/html; charset=utf-8");
+        send(response, 200, pages.home, "text/html; charset=utf-8");
+        return;
+      }
+
+      if (request.method === "GET" && url.pathname === "/chat") {
+        send(response, 200, pages.chat, "text/html; charset=utf-8");
         return;
       }
 
@@ -145,7 +150,10 @@ export function createFrontendServer(client: BackendClient, html: string) {
 export function startFrontendServer() {
   const config = getFrontendConfig();
   const client = new BackendClient(config.apiBaseUrl, config.adminToken);
-  const server = createFrontendServer(client, renderDashboard(config));
+  const server = createFrontendServer(client, {
+    home: renderHomePage(config),
+    chat: renderChatPage()
+  });
   server.listen(config.port, () => {
     console.log(
       JSON.stringify({

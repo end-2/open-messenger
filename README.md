@@ -44,6 +44,11 @@ cd frontend
 npm run dev
 ```
 
+The frontend now exposes two browser pages:
+
+- `http://127.0.0.1:3001/`: service snapshot and user/token bootstrap
+- `http://127.0.0.1:3001/chat`: channel and message console with a chat-room layout
+
 Run frontend unit tests locally:
 
 ```bash

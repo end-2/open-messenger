@@ -18,7 +18,10 @@ test("frontend server exposes health endpoint", async () => {
         file_store_impl: "LocalFileStore"
       })
     },
-    "<html></html>"
+    {
+      home: "<html><body>home</body></html>",
+      chat: "<html><body>chat</body></html>"
+    }
   );
 
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -29,6 +32,45 @@ test("frontend server exposes health endpoint", async () => {
     const response = await fetch(`http://127.0.0.1:${address.port}/healthz`);
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), { status: "ok" });
+  } finally {
+    await new Promise<void>((resolve, reject) => {
+      server.close((error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve();
+      });
+    });
+  }
+});
+
+test("frontend server serves home and chat pages", async () => {
+  const server = createFrontendServer(
+    {
+      getInfo: async () => {
+        throw new Error("not used");
+      }
+    },
+    {
+      home: "<html><body>home-page</body></html>",
+      chat: "<html><body>chat-page</body></html>"
+    }
+  );
+
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+
+  try {
+    const address = server.address();
+    assert(address && typeof address === "object");
+
+    const homeResponse = await fetch(`http://127.0.0.1:${address.port}/`);
+    assert.equal(homeResponse.status, 200);
+    assert.match(await homeResponse.text(), /home-page/);
+
+    const chatResponse = await fetch(`http://127.0.0.1:${address.port}/chat`);
+    assert.equal(chatResponse.status, 200);
+    assert.match(await chatResponse.text(), /chat-page/);
   } finally {
     await new Promise<void>((resolve, reject) => {
       server.close((error) => {
