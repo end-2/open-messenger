@@ -176,3 +176,7 @@ Docker:
 - [Low-level design](docs/LOW_LEVEL_DESIGN.md)
 - [Deployment and operations](docs/DEPLOYMENT.md)
 - [OpenAPI specification](docs/openapi.yaml)
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
