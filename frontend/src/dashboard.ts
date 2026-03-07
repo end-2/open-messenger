@@ -618,7 +618,7 @@ export function renderHomePage(config: FrontendConfig): string {
           <div class="status" id="chat-entry-status"></div>
           <p class="hint">If you bootstrap a user here, the returned token is stored locally and can be reused when entering the chat page.</p>
         </article>
-        <article class="panel viewport-panel home-grid-user">
+        <article class="panel home-grid-user">
           <h2>User Creation</h2>
           <form class="stack" id="bootstrap-form">
             <div class="row">
