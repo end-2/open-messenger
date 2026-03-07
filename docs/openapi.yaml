@@ -1,0 +1,1308 @@
+openapi: 3.1.0
+info:
+  title: Open Messenger API
+  version: v0.1
+  description: HTTP API specification for Open Messenger. The WebSocket endpoint `/v1/events/ws`
+    is not included because OpenAPI covers HTTP operations only.
+paths:
+  /v1/events/stream:
+    get:
+      summary: Stream Events
+      operationId: stream_events_v1_events_stream_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            text/event-stream:
+              schema:
+                type: string
+      tags:
+      - Native API
+      security:
+      - BearerToken: []
+  /healthz:
+    get:
+      summary: Healthz
+      operationId: healthz_healthz_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties:
+                  type: string
+                type: object
+                title: Response Healthz Healthz Get
+      tags:
+      - System
+  /readyz:
+    get:
+      summary: Readyz
+      operationId: readyz_readyz_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+      tags:
+      - System
+  /metrics:
+    get:
+      summary: Metrics
+      operationId: metrics_metrics_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            text/plain:
+              schema:
+                type: string
+      tags:
+      - System
+  /v1/info:
+    get:
+      summary: Service Info
+      operationId: service_info_v1_info_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties:
+                  type: string
+                type: object
+                title: Response Service Info V1 Info Get
+      tags:
+      - System
+  /v1/channels:
+    post:
+      summary: Create Channel
+      operationId: create_channel_v1_channels_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateChannelRequest'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChannelResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      tags:
+      - Native API
+      security:
+      - BearerToken: []
+  /v1/channels/{channel_id}:
+    get:
+      summary: Get Channel
+      operationId: get_channel_v1_channels__channel_id__get
+      parameters:
+      - name: channel_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Channel Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChannelResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      tags:
+      - Native API
+      security:
+      - BearerToken: []
+  /v1/channels/{channel_id}/messages:
+    post:
+      summary: Create Channel Message
+      operationId: create_channel_message_v1_channels__channel_id__messages_post
+      parameters:
+      - name: channel_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Channel Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateMessageRequest'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      tags:
+      - Native API
+      security:
+      - BearerToken: []
+    get:
+      summary: List Channel Messages
+      operationId: list_channel_messages_v1_channels__channel_id__messages_get
+      parameters:
+      - name: channel_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Channel Id
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Cursor
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 200
+          minimum: 1
+          default: 50
+          title: Limit
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListMessagesResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      tags:
+      - Native API
+      security:
+      - BearerToken: []
+  /v1/messages:batchGet:
+    post:
+      summary: Batch Get Messages
+      operationId: batch_get_messages_v1_messages_batchGet_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchGetMessagesRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchGetMessagesResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      tags:
+      - Native API
+      security:
+      - BearerToken: []
+  /v1/messages:batchCreate:
+    post:
+      summary: Batch Create Messages
+      operationId: batch_create_messages_v1_messages_batchCreate_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchCreateMessagesRequest'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchCreateMessagesResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      tags:
+      - Native API
+      security:
+      - BearerToken: []
+  /v1/channels/{channel_id}/threads:
+    post:
+      summary: Create Channel Thread
+      operationId: create_channel_thread_v1_channels__channel_id__threads_post
+      parameters:
+      - name: channel_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Channel Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateThreadRequest'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ThreadResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      tags:
+      - Native API
+      security:
+      - BearerToken: []
+  /v1/threads/{thread_id}/context:
+    get:
+      summary: Get Thread Context
+      operationId: get_thread_context_v1_threads__thread_id__context_get
+      parameters:
+      - name: thread_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Thread Id
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 200
+          minimum: 1
+          default: 50
+          title: Limit
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ThreadContextResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      tags:
+      - Native API
+      security:
+      - BearerToken: []
+  /v1/threads/{thread_id}/messages:
+    post:
+      summary: Create Thread Message
+      operationId: create_thread_message_v1_threads__thread_id__messages_post
+      parameters:
+      - name: thread_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Thread Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateMessageRequest'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      tags:
+      - Native API
+      security:
+      - BearerToken: []
+  /v1/files:
+    post:
+      summary: Upload File
+      operationId: upload_file_v1_files_post
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Body_upload_file_v1_files_post'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileObjectResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      tags:
+      - Native API
+      security:
+      - BearerToken: []
+  /v1/files/{file_id}:
+    get:
+      summary: Get File
+      operationId: get_file_v1_files__file_id__get
+      parameters:
+      - name: file_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: File Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      tags:
+      - Native API
+      security:
+      - BearerToken: []
+  /compat/slack/chat.postMessage:
+    post:
+      summary: Slack Chat Post Message
+      operationId: slack_chat_post_message_compat_slack_chat_postMessage_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SlackPostMessageRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                type: object
+                title: Response Slack Chat Post Message Compat Slack Chat Postmessage
+                  Post
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      tags:
+      - Compatibility API
+      security:
+      - BearerToken: []
+  /compat/slack/files.upload:
+    post:
+      summary: Slack Files Upload
+      operationId: slack_files_upload_compat_slack_files_upload_post
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Body_slack_files_upload_compat_slack_files_upload_post'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                type: object
+                title: Response Slack Files Upload Compat Slack Files Upload Post
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      tags:
+      - Compatibility API
+      security:
+      - BearerToken: []
+  /compat/telegram/bot{bot_token}/sendMessage:
+    post:
+      summary: Telegram Send Message
+      operationId: telegram_send_message_compat_telegram_bot_bot_token__sendMessage_post
+      parameters:
+      - name: bot_token
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Bot Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TelegramSendMessageRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Telegram Send Message Compat Telegram Bot Bot Token  Sendmessage
+                  Post
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      tags:
+      - Compatibility API
+  /compat/telegram/bot{bot_token}/sendDocument:
+    post:
+      summary: Telegram Send Document
+      operationId: telegram_send_document_compat_telegram_bot_bot_token__sendDocument_post
+      parameters:
+      - name: bot_token
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Bot Token
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Body_telegram_send_document_compat_telegram_bot_bot_token__sendDocument_post'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Telegram Send Document Compat Telegram Bot Bot Token  Senddocument
+                  Post
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      tags:
+      - Compatibility API
+  /compat/discord/channels/{channel_id}/messages:
+    post:
+      summary: Discord Create Message
+      operationId: discord_create_message_compat_discord_channels__channel_id__messages_post
+      parameters:
+      - name: channel_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Channel Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Discord Create Message Compat Discord Channels  Channel
+                  Id  Messages Post
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      tags:
+      - Compatibility API
+      security:
+      - BearerToken: []
+  /admin/v1/users:
+    post:
+      summary: Create Admin User
+      operationId: create_admin_user_admin_v1_users_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      tags:
+      - Admin API
+      security:
+      - AdminToken: []
+  /admin/v1/tokens:
+    post:
+      summary: Create Admin Token
+      operationId: create_admin_token_admin_v1_tokens_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTokenRequest'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateTokenResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      tags:
+      - Admin API
+      security:
+      - AdminToken: []
+  /admin/v1/tokens/{token_id}/rotate:
+    post:
+      summary: Rotate Admin Token
+      operationId: rotate_admin_token_admin_v1_tokens__token_id__rotate_post
+      parameters:
+      - name: token_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Token Id
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateTokenResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      tags:
+      - Admin API
+      security:
+      - AdminToken: []
+  /admin/v1/tokens/{token_id}:
+    delete:
+      summary: Revoke Admin Token
+      operationId: revoke_admin_token_admin_v1_tokens__token_id__delete
+      parameters:
+      - name: token_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Token Id
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      tags:
+      - Admin API
+      security:
+      - AdminToken: []
+components:
+  schemas:
+    BatchCreateMessageItem:
+      properties:
+        text:
+          type: string
+          minLength: 1
+          title: Text
+        sender_user_id:
+          type: string
+          title: Sender User Id
+          default: system
+        thread_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Thread Id
+        attachments:
+          items:
+            type: string
+          type: array
+          title: Attachments
+        idempotency_key:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Idempotency Key
+        metadata:
+          additionalProperties: true
+          type: object
+          title: Metadata
+        blocks:
+          items:
+            additionalProperties: true
+            type: object
+          type: array
+          title: Blocks
+        mentions:
+          items:
+            type: string
+          type: array
+          title: Mentions
+        raw_payload:
+          additionalProperties: true
+          type: object
+          title: Raw Payload
+        channel_id:
+          type: string
+          minLength: 1
+          title: Channel Id
+      type: object
+      required:
+      - text
+      - channel_id
+      title: BatchCreateMessageItem
+    BatchCreateMessagesRequest:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/BatchCreateMessageItem'
+          type: array
+          maxItems: 100
+          minItems: 1
+          title: Items
+      type: object
+      required:
+      - items
+      title: BatchCreateMessagesRequest
+    BatchCreateMessagesResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/MessageResponse'
+          type: array
+          title: Items
+      type: object
+      required:
+      - items
+      title: BatchCreateMessagesResponse
+    BatchGetMessagesRequest:
+      properties:
+        message_ids:
+          items:
+            type: string
+          type: array
+          maxItems: 200
+          minItems: 1
+          title: Message Ids
+      type: object
+      required:
+      - message_ids
+      title: BatchGetMessagesRequest
+    BatchGetMessagesResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/MessageResponse'
+          type: array
+          title: Items
+        not_found_ids:
+          items:
+            type: string
+          type: array
+          title: Not Found Ids
+      type: object
+      required:
+      - items
+      - not_found_ids
+      title: BatchGetMessagesResponse
+    Body_slack_files_upload_compat_slack_files_upload_post:
+      properties:
+        channels:
+          type: string
+          title: Channels
+        file:
+          type: string
+          title: File
+        thread_ts:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Thread Ts
+        initial_comment:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Initial Comment
+      type: object
+      required:
+      - channels
+      - file
+      title: Body_slack_files_upload_compat_slack_files_upload_post
+    Body_telegram_send_document_compat_telegram_bot_bot_token__sendDocument_post:
+      properties:
+        chat_id:
+          type: string
+          title: Chat Id
+        document:
+          type: string
+          title: Document
+        caption:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Caption
+        reply_to_message_id:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Reply To Message Id
+      type: object
+      required:
+      - chat_id
+      - document
+      title: Body_telegram_send_document_compat_telegram_bot_bot_token__sendDocument_post
+    Body_upload_file_v1_files_post:
+      properties:
+        file:
+          type: string
+          title: File
+      type: object
+      required:
+      - file
+      title: Body_upload_file_v1_files_post
+    ChannelResponse:
+      properties:
+        channel_id:
+          type: string
+          title: Channel Id
+        name:
+          type: string
+          title: Name
+        created_at:
+          type: string
+          title: Created At
+      type: object
+      required:
+      - channel_id
+      - name
+      - created_at
+      title: ChannelResponse
+    CreateChannelRequest:
+      properties:
+        name:
+          type: string
+          maxLength: 200
+          minLength: 1
+          title: Name
+      type: object
+      required:
+      - name
+      title: CreateChannelRequest
+    CreateMessageRequest:
+      properties:
+        text:
+          type: string
+          minLength: 1
+          title: Text
+        sender_user_id:
+          type: string
+          title: Sender User Id
+          default: system
+        thread_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Thread Id
+        attachments:
+          items:
+            type: string
+          type: array
+          title: Attachments
+        idempotency_key:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Idempotency Key
+        metadata:
+          additionalProperties: true
+          type: object
+          title: Metadata
+        blocks:
+          items:
+            additionalProperties: true
+            type: object
+          type: array
+          title: Blocks
+        mentions:
+          items:
+            type: string
+          type: array
+          title: Mentions
+        raw_payload:
+          additionalProperties: true
+          type: object
+          title: Raw Payload
+      type: object
+      required:
+      - text
+      title: CreateMessageRequest
+    CreateThreadRequest:
+      properties:
+        root_message_id:
+          type: string
+          minLength: 1
+          title: Root Message Id
+      type: object
+      required:
+      - root_message_id
+      title: CreateThreadRequest
+    CreateTokenRequest:
+      properties:
+        user_id:
+          type: string
+          minLength: 1
+          title: User Id
+        token_type:
+          type: string
+          enum:
+          - user_token
+          - bot_token
+          - service_token
+          title: Token Type
+          default: user_token
+        scopes:
+          items:
+            type: string
+          type: array
+          title: Scopes
+      type: object
+      required:
+      - user_id
+      title: CreateTokenRequest
+    CreateTokenResponse:
+      properties:
+        token_id:
+          type: string
+          title: Token Id
+        user_id:
+          type: string
+          title: User Id
+        token_type:
+          type: string
+          title: Token Type
+        scopes:
+          items:
+            type: string
+          type: array
+          title: Scopes
+        created_at:
+          type: string
+          title: Created At
+        revoked_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Revoked At
+        token:
+          type: string
+          title: Token
+      type: object
+      required:
+      - token_id
+      - user_id
+      - token_type
+      - scopes
+      - created_at
+      - revoked_at
+      - token
+      title: CreateTokenResponse
+    CreateUserRequest:
+      properties:
+        username:
+          type: string
+          maxLength: 64
+          minLength: 1
+          title: Username
+        display_name:
+          anyOf:
+          - type: string
+            maxLength: 100
+          - type: 'null'
+          title: Display Name
+      type: object
+      required:
+      - username
+      title: CreateUserRequest
+    FileObjectResponse:
+      properties:
+        file_id:
+          type: string
+          title: File Id
+        uploader_user_id:
+          type: string
+          title: Uploader User Id
+        filename:
+          type: string
+          title: Filename
+        mime_type:
+          type: string
+          title: Mime Type
+        size_bytes:
+          type: integer
+          title: Size Bytes
+        sha256:
+          type: string
+          title: Sha256
+        created_at:
+          type: string
+          title: Created At
+      type: object
+      required:
+      - file_id
+      - uploader_user_id
+      - filename
+      - mime_type
+      - size_bytes
+      - sha256
+      - created_at
+      title: FileObjectResponse
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    ListMessagesResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/MessageResponse'
+          type: array
+          title: Items
+        next_cursor:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Next Cursor
+      type: object
+      required:
+      - items
+      - next_cursor
+      title: ListMessagesResponse
+    MessageResponse:
+      properties:
+        message_id:
+          type: string
+          title: Message Id
+        channel_id:
+          type: string
+          title: Channel Id
+        thread_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Thread Id
+        sender_user_id:
+          type: string
+          title: Sender User Id
+        content_ref:
+          type: string
+          title: Content Ref
+        text:
+          type: string
+          title: Text
+        attachments:
+          items:
+            type: string
+          type: array
+          title: Attachments
+        created_at:
+          type: string
+          title: Created At
+        updated_at:
+          type: string
+          title: Updated At
+        deleted_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Deleted At
+        compat_origin:
+          type: string
+          title: Compat Origin
+        idempotency_key:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Idempotency Key
+        metadata:
+          additionalProperties: true
+          type: object
+          title: Metadata
+      type: object
+      required:
+      - message_id
+      - channel_id
+      - thread_id
+      - sender_user_id
+      - content_ref
+      - text
+      - attachments
+      - created_at
+      - updated_at
+      - deleted_at
+      - compat_origin
+      - idempotency_key
+      - metadata
+      title: MessageResponse
+    SlackPostMessageRequest:
+      properties:
+        channel:
+          type: string
+          minLength: 1
+          title: Channel
+        text:
+          type: string
+          minLength: 1
+          title: Text
+        thread_ts:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Thread Ts
+      type: object
+      required:
+      - channel
+      - text
+      title: SlackPostMessageRequest
+    TelegramSendMessageRequest:
+      properties:
+        chat_id:
+          type: string
+          minLength: 1
+          title: Chat Id
+        text:
+          type: string
+          minLength: 1
+          title: Text
+        reply_to_message_id:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Reply To Message Id
+      type: object
+      required:
+      - chat_id
+      - text
+      title: TelegramSendMessageRequest
+    ThreadContextResponse:
+      properties:
+        thread:
+          $ref: '#/components/schemas/ThreadResponse'
+        root_message:
+          $ref: '#/components/schemas/MessageResponse'
+        replies:
+          items:
+            $ref: '#/components/schemas/MessageResponse'
+          type: array
+          title: Replies
+        has_more_replies:
+          type: boolean
+          title: Has More Replies
+      type: object
+      required:
+      - thread
+      - root_message
+      - replies
+      - has_more_replies
+      title: ThreadContextResponse
+    ThreadResponse:
+      properties:
+        thread_id:
+          type: string
+          title: Thread Id
+        channel_id:
+          type: string
+          title: Channel Id
+        root_message_id:
+          type: string
+          title: Root Message Id
+        reply_count:
+          type: integer
+          title: Reply Count
+        last_message_at:
+          type: string
+          title: Last Message At
+        created_at:
+          type: string
+          title: Created At
+      type: object
+      required:
+      - thread_id
+      - channel_id
+      - root_message_id
+      - reply_count
+      - last_message_at
+      - created_at
+      title: ThreadResponse
+    UserResponse:
+      properties:
+        user_id:
+          type: string
+          title: User Id
+        username:
+          type: string
+          title: Username
+        display_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Display Name
+        created_at:
+          type: string
+          title: Created At
+      type: object
+      required:
+      - user_id
+      - username
+      - display_name
+      - created_at
+      title: UserResponse
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+        input:
+          title: Input
+        ctx:
+          type: object
+          title: Context
+      type: object
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError
+  securitySchemes:
+    BearerToken:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT-like
+      description: 'Use `Authorization: Bearer <token>` for Native API requests. Compatibility
+        endpoints that reuse bearer auth may also accept `Authorization: Bot <token>`.'
+    AdminToken:
+      type: apiKey
+      in: header
+      name: X-Admin-Token
+      description: Administrative token required by `/admin/v1/*` endpoints.
+servers:
+- url: http://localhost:8000
+  description: Local development
+tags:
+- name: System
+  description: Health, readiness, metrics, and service metadata.
+- name: Native API
+  description: Primary Open Messenger HTTP API under `/v1`.
+- name: Admin API
+  description: Administrative endpoints under `/admin/v1`.
+- name: Compatibility API
+  description: Slack, Telegram, and Discord compatibility endpoints.

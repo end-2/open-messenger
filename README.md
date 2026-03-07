@@ -83,6 +83,7 @@ make deploy-prod-config
 ```
 
 Deployment profiles, environment templates, monitoring layout, and rollback/runbook steps are documented in [`docs/DEPLOY.md`](docs/DEPLOY.md).
+The checked-in HTTP OpenAPI document is [`docs/openapi.yaml`](docs/openapi.yaml) and can be regenerated with `PYTHONPATH=backend .venv/bin/python scripts/generate_openapi.py`.
 
 ## API Smoke Check
 
