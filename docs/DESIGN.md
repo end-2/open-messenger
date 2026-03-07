@@ -83,6 +83,7 @@
 [Storage Abstraction Layer]
    | MessageContentStore: memory/file/redis
    | MetadataStore: memory/file/mysql
+   | FileBinaryStore: local (extensible)
 ```
 
 ## 5. 데이터 모델
@@ -129,6 +130,7 @@
 - `filename`
 - `mime_type`
 - `size_bytes`
+- `storage_backend`
 - `storage_path`
 - `sha256`
 
@@ -175,6 +177,14 @@ class MetadataStore(Protocol):
 - 로컬 개발: `memory + memory`
 - 단일 인스턴스: `file + file`
 - 운영: `redis + mysql`
+
+### 6.4 File Binary Storage
+
+- Default backend: `local`
+- Config key: `file_storage_backend`
+- Local backend root: `files_root_dir`
+- Message attachments store file IDs in message metadata and must reference existing `FileObject` records.
+- Binary persistence is separated from metadata persistence so future object storage backends can be added without changing message or file metadata APIs.
 
 ## 7. 인증/인가
 

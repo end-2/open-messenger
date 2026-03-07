@@ -137,6 +137,15 @@ curl -X POST http://localhost:8000/v1/files -H "Authorization: Bearer <token>" -
 curl -L http://localhost:8000/v1/files/<file_id> -H "Authorization: Bearer <token>" -o downloaded.bin
 ```
 
+Attach an uploaded file to a message:
+
+```bash
+curl -X POST http://localhost:8000/v1/channels/<channel_id>/messages \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <token>" \
+  -d '{"text":"see attachment","attachments":["<file_id>"]}'
+```
+
 Create a thread from a root message and post a reply:
 
 ```bash
@@ -187,21 +196,23 @@ Errors are standardized as:
 When request volume exceeds the configured window on `/v1` or `/admin/v1`, the API returns `429` with `code=rate_limited` and a `Retry-After` header. The limiter keys by bearer token, admin token, or client IP when no token is present. `/healthz` is excluded.
 
 `/v1/info` reports the configured backend names and selected store implementation classes.
-`memory`, `file`, `redis`, and `mysql` backends are implemented.
+`memory`, `file`, `redis`, `mysql`, and `local` file-binary storage are implemented.
 Slack `thread_ts`, Telegram `reply_to_message_id`, and Discord `message_reference` are mapped onto internal thread/reply relationships through metadata-backed compatibility mappings.
 `GET /v1/events/stream` provides an SSE feed with standard event payloads shaped as `event_id`, `type`, `occurred_at`, and `data`.
 `GET /v1/events/ws` provides the same event payloads over WebSocket. The socket requires `messages:read` scope, accepts `Authorization: Bearer <token>` or `access_token` query authentication, and responds to `ping` with `{"type":"pong"}`.
+Message attachments must reference existing file IDs returned by `POST /v1/files` or compatible upload endpoints.
 
 ## Storage Configuration
 
 - `OPEN_MESSENGER_CONTENT_BACKEND`: `memory | file | redis`
 - `OPEN_MESSENGER_METADATA_BACKEND`: `memory | file | mysql`
+- `OPEN_MESSENGER_FILE_STORAGE_BACKEND`: `local`
 - `OPEN_MESSENGER_STORAGE_DIR`: filesystem root used by `file` backends
+- `OPEN_MESSENGER_FILES_ROOT_DIR`: filesystem root used by the `local` file storage backend
 - `OPEN_MESSENGER_REDIS_URL`: Redis URL used by `redis` content backend
 - `OPEN_MESSENGER_REDIS_CONTENT_KEY_PREFIX`: Redis key prefix for message content
 - `OPEN_MESSENGER_MYSQL_DSN`: MySQL DSN used by `mysql` metadata backend
 - `OPEN_MESSENGER_MYSQL_TABLE_PREFIX`: table prefix used by MySQL metadata tables
-- `OPEN_MESSENGER_FILES_ROOT_DIR`: filesystem root used by `/v1/files` upload/download
 - `OPEN_MESSENGER_MAX_UPLOAD_MB`: max upload size in MB for `/v1/files`
 - `OPEN_MESSENGER_ADMIN_API_TOKEN`: required value for `X-Admin-Token` on `/admin/v1/*`
 - `OPEN_MESSENGER_TOKEN_SIGNING_SECRET`: signing secret for JWT-like token signature verification

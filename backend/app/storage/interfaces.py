@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import AsyncIterable
 from typing import Any, Protocol
 
 
@@ -93,4 +94,23 @@ class MetadataStore(Protocol):
         ...
 
     async def next_compat_sequence(self, origin: str, channel_id: str) -> int:
+        ...
+
+
+class FileBinaryStore(Protocol):
+    """Stores and retrieves uploaded file binaries."""
+
+    backend_name: str
+
+    async def save(
+        self,
+        file_id: str,
+        filename: str,
+        chunks: AsyncIterable[bytes],
+        *,
+        max_size_bytes: int,
+    ) -> dict[str, Any]:
+        ...
+
+    async def exists(self, storage_path: str) -> bool:
         ...

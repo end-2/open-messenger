@@ -3,6 +3,7 @@ profiles:
     environment: dev
     content_backend: memory
     metadata_backend: memory
+    file_storage_backend: local
     storage_dir: data/storage
     redis_url: redis://localhost:6379/0
     redis_content_key_prefix: open_messenger:content
@@ -16,6 +17,7 @@ profiles:
     environment: staging
     content_backend: file
     metadata_backend: file
+    file_storage_backend: local
     storage_dir: data/storage
     redis_url: redis://redis:6379/0
     redis_content_key_prefix: open_messenger:content
@@ -29,6 +31,7 @@ profiles:
     environment: prod
     content_backend: redis
     metadata_backend: mysql
+    file_storage_backend: local
     storage_dir: data/storage
     redis_url: redis://redis:6379/0
     redis_content_key_prefix: open_messenger:content

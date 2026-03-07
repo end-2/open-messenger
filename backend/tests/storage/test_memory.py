@@ -147,6 +147,7 @@ def test_in_memory_metadata_store_message_pagination() -> None:
                 "filename": "hello.txt",
                 "mime_type": "text/plain",
                 "size_bytes": 5,
+                "storage_backend": "local",
                 "storage_path": "/tmp/hello.txt",
                 "sha256": "abc123",
             }

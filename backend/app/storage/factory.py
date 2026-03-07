@@ -4,8 +4,9 @@ from pathlib import Path
 from typing import Any
 
 from app.config import Settings
+from app.storage.blob import LocalFileBinaryStore
 from app.storage.file import FileMessageContentStore, FileMetadataStore
-from app.storage.interfaces import MessageContentStore, MetadataStore
+from app.storage.interfaces import FileBinaryStore, MessageContentStore, MetadataStore
 from app.storage.memory import InMemoryMessageContentStore, InMemoryMetadataStore
 from app.storage.mysql_store import MySQLMetadataStore
 from app.storage.redis_store import RedisMessageContentStore
@@ -120,13 +121,43 @@ class UnsupportedMetadataStore(MetadataStore):
         )
 
 
-def build_storage_registry(settings: Settings) -> tuple[MessageContentStore, MetadataStore]:
+class UnsupportedFileBinaryStore(FileBinaryStore):
+    """Placeholder for file storage backends not implemented yet."""
+
+    def __init__(self, backend_name: str) -> None:
+        self.backend_name = backend_name
+
+    async def save(
+        self,
+        file_id: str,
+        filename: str,
+        chunks: Any,
+        *,
+        max_size_bytes: int,
+    ) -> dict[str, Any]:
+        del file_id, filename, chunks, max_size_bytes
+        self._raise_not_supported()
+
+    async def exists(self, storage_path: str) -> bool:
+        del storage_path
+        self._raise_not_supported()
+
+    def _raise_not_supported(self) -> None:
+        raise NotImplementedError(
+            f"File storage backend '{self.backend_name}' is not implemented yet."
+        )
+
+
+def build_storage_registry(
+    settings: Settings,
+) -> tuple[MessageContentStore, MetadataStore, FileBinaryStore]:
     """Build store instances selected by runtime configuration."""
 
     storage_root = Path(settings.storage_dir)
 
     content_store: MessageContentStore
     metadata_store: MetadataStore
+    file_store: FileBinaryStore
 
     if settings.content_backend == "memory":
         content_store = InMemoryMessageContentStore()
@@ -152,4 +183,9 @@ def build_storage_registry(settings: Settings) -> tuple[MessageContentStore, Met
     else:
         metadata_store = UnsupportedMetadataStore(settings.metadata_backend)
 
-    return content_store, metadata_store
+    if settings.file_storage_backend == "local":
+        file_store = LocalFileBinaryStore(settings.files_root_dir)
+    else:
+        file_store = UnsupportedFileBinaryStore(settings.file_storage_backend)
+
+    return content_store, metadata_store, file_store

@@ -332,6 +332,7 @@ def test_mysql_metadata_store_contract_with_in_memory_backend() -> None:
                 "filename": "hello.txt",
                 "mime_type": "text/plain",
                 "size_bytes": 5,
+                "storage_backend": "local",
                 "storage_path": "/tmp/hello.txt",
                 "sha256": "abc123",
             }

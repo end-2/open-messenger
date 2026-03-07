@@ -139,12 +139,19 @@ async def slack_files_upload(
     settings: Settings = request.app.state.settings
     metadata_store = request.app.state.metadata_store
     content_store = request.app.state.content_store
+    file_store = request.app.state.file_store
     context = await authenticate_compat_bearer_token(request, ["files:write", "messages:write"])
 
     channel_id = channels.split(",", 1)[0].strip()
     await get_channel_or_404(metadata_store, channel_id)
 
-    stored_file = await store_uploaded_file(settings, metadata_store, file, context.user_id)
+    stored_file = await store_uploaded_file(
+        settings,
+        metadata_store,
+        file_store,
+        file,
+        context.user_id,
+    )
     await publish_event(
         request,
         event_type="file.uploaded",
@@ -321,10 +328,17 @@ async def telegram_send_document(
     settings: Settings = request.app.state.settings
     metadata_store = request.app.state.metadata_store
     content_store = request.app.state.content_store
+    file_store = request.app.state.file_store
     context = await authenticate_telegram_bot_token(request, bot_token, ["files:write", "messages:write"])
 
     await get_channel_or_404(metadata_store, chat_id)
-    stored_file = await store_uploaded_file(settings, metadata_store, document, context.user_id)
+    stored_file = await store_uploaded_file(
+        settings,
+        metadata_store,
+        file_store,
+        document,
+        context.user_id,
+    )
     await publish_event(
         request,
         event_type="file.uploaded",
@@ -413,6 +427,7 @@ async def discord_create_message(
     metadata_store = request.app.state.metadata_store
     content_store = request.app.state.content_store
     settings: Settings = request.app.state.settings
+    file_store = request.app.state.file_store
     context = await authenticate_compat_bearer_token(request, ["messages:write"])
 
     await get_channel_or_404(metadata_store, channel_id)
@@ -452,7 +467,13 @@ async def discord_create_message(
     attachment_ids: list[str] = []
     attachment_payloads: list[dict[str, Any]] = []
     for upload in files:
-        stored_file = await store_uploaded_file(settings, metadata_store, upload, context.user_id)
+        stored_file = await store_uploaded_file(
+            settings,
+            metadata_store,
+            file_store,
+            upload,
+            context.user_id,
+        )
         attachment_ids.append(str(stored_file["file_id"]))
         attachment_payloads.append(
             {

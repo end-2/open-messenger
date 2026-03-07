@@ -96,6 +96,7 @@ class FileObject:
     filename: str
     mime_type: str
     size_bytes: int
+    storage_backend: str
     storage_path: str
     sha256: str
     created_at: str = field(default_factory=utc_now_iso8601)

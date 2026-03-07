@@ -150,6 +150,7 @@ def service_info(
 ) -> dict[str, str]:
     content_store = request.app.state.content_store
     metadata_store = request.app.state.metadata_store
+    file_store = request.app.state.file_store
 
     return {
         "service": settings.app_name,
@@ -157,8 +158,10 @@ def service_info(
         "environment": settings.environment,
         "content_backend": settings.content_backend,
         "metadata_backend": settings.metadata_backend,
+        "file_storage_backend": settings.file_storage_backend,
         "content_store_impl": content_store.__class__.__name__,
         "metadata_store_impl": metadata_store.__class__.__name__,
+        "file_store_impl": file_store.__class__.__name__,
     }
 
 
@@ -407,7 +410,8 @@ async def upload_file(
 ) -> dict[str, Any]:
     settings: Settings = request.app.state.settings
     metadata_store = request.app.state.metadata_store
-    stored = await store_uploaded_file(settings, metadata_store, file, context.user_id)
+    file_store = request.app.state.file_store
+    stored = await store_uploaded_file(settings, metadata_store, file_store, file, context.user_id)
     await publish_event(
         request,
         event_type="file.uploaded",
@@ -430,6 +434,7 @@ async def get_file(
     _: AuthContext = Depends(require_scopes(["files:read"])),
 ) -> FileResponse:
     metadata_store = request.app.state.metadata_store
+    file_store = request.app.state.file_store
     file_object = await metadata_store.get_file(file_id)
     if file_object is None:
         raise api_error(
@@ -439,8 +444,8 @@ async def get_file(
             retryable=False,
         )
 
-    storage_path = Path(str(file_object.get("storage_path", "")))
-    if not storage_path.exists():
+    storage_path = str(file_object.get("storage_path", ""))
+    if not await file_store.exists(storage_path):
         raise api_error(
             status_code=status.HTTP_404_NOT_FOUND,
             code="file_not_found",
@@ -449,7 +454,7 @@ async def get_file(
         )
 
     return FileResponse(
-        path=storage_path,
+        path=Path(storage_path),
         media_type=str(file_object.get("mime_type") or "application/octet-stream"),
-        filename=str(file_object.get("filename") or storage_path.name),
+        filename=str(file_object.get("filename") or Path(storage_path).name),
     )

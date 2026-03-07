@@ -1,5 +1,6 @@
 import asyncio
 
+from app.storage.blob import LocalFileBinaryStore
 from app.storage.file import FileMessageContentStore, FileMetadataStore
 
 
@@ -158,6 +159,7 @@ def test_file_metadata_store_persists_and_paginates(tmp_path) -> None:
                 "filename": "hello.txt",
                 "mime_type": "text/plain",
                 "size_bytes": 5,
+                "storage_backend": "local",
                 "storage_path": "/tmp/hello.txt",
                 "sha256": "abc123",
             }
@@ -190,3 +192,44 @@ def test_file_metadata_store_persists_and_paginates(tmp_path) -> None:
         asyncio.run(reloaded_store.get_compat_mapping("discord", "message", "42", "channel-a"))
         == mapping
     )
+
+
+async def _chunk_stream(chunks: list[bytes]):
+    for chunk in chunks:
+        yield chunk
+
+
+def test_local_file_binary_store_saves_and_checks_files(tmp_path) -> None:
+    store = LocalFileBinaryStore(tmp_path / "files")
+
+    stored = asyncio.run(
+        store.save(
+            "fil-1",
+            "hello.txt",
+            _chunk_stream([b"hello", b"-world"]),
+            max_size_bytes=64,
+        )
+    )
+
+    assert stored["storage_backend"] == "local"
+    assert stored["size_bytes"] == 11
+    assert stored["sha256"]
+    assert asyncio.run(store.exists(stored["storage_path"])) is True
+
+
+def test_local_file_binary_store_enforces_size_limit(tmp_path) -> None:
+    store = LocalFileBinaryStore(tmp_path / "files")
+
+    try:
+        asyncio.run(
+            store.save(
+                "fil-1",
+                "large.txt",
+                _chunk_stream([b"0123456789"]),
+                max_size_bytes=5,
+            )
+        )
+    except ValueError as exc:
+        assert str(exc) == "file_too_large"
+    else:
+        raise AssertionError("Expected file_too_large error")

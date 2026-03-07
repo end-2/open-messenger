@@ -20,7 +20,7 @@ Optional: run with redis/mysql-backed storage:
 - `OPEN_MESSENGER_CONTENT_BACKEND=redis OPEN_MESSENGER_METADATA_BACKEND=mysql OPEN_MESSENGER_REDIS_URL=redis://localhost:6379/0 OPEN_MESSENGER_MYSQL_DSN=mysql+pymysql://app:app@localhost:3306/open_messenger make run`
 
 Optional: customize file upload storage:
-- `OPEN_MESSENGER_FILES_ROOT_DIR=data/files OPEN_MESSENGER_MAX_UPLOAD_MB=50 make run`
+- `OPEN_MESSENGER_FILE_STORAGE_BACKEND=local OPEN_MESSENGER_FILES_ROOT_DIR=data/files OPEN_MESSENGER_MAX_UPLOAD_MB=50 make run`
 
 Optional: tighten or disable rate limiting during local runs:
 - `OPEN_MESSENGER_RATE_LIMIT_MAX_REQUESTS=10 OPEN_MESSENGER_RATE_LIMIT_WINDOW_SECONDS=60 make run`

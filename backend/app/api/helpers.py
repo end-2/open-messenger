@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
 import re
 import secrets
+from collections.abc import AsyncIterable
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
@@ -224,38 +224,30 @@ async def get_channel_or_404(metadata_store: Any, channel_id: str) -> dict[str, 
 async def store_uploaded_file(
     settings: Settings,
     metadata_store: Any,
+    file_store: Any,
     upload: UploadFile,
     uploader_user_id: str,
 ) -> dict[str, Any]:
-    files_root = Path(settings.files_root_dir)
-    files_root.mkdir(parents=True, exist_ok=True)
-
     file_id = new_id("fil")
     safe_filename = sanitize_filename(upload.filename)
-    storage_path = files_root / f"{file_id}_{safe_filename}"
     max_size_bytes = int(settings.max_upload_mb * 1024 * 1024)
 
-    digest = hashlib.sha256()
-    size_bytes = 0
-
     try:
-        with storage_path.open("wb") as file_pointer:
-            while True:
-                chunk = await upload.read(1024 * 1024)
-                if not chunk:
-                    break
-                size_bytes += len(chunk)
-                if size_bytes > max_size_bytes:
-                    file_pointer.close()
-                    storage_path.unlink(missing_ok=True)
-                    raise api_error(
-                        status_code=status.HTTP_413_CONTENT_TOO_LARGE,
-                        code="file_too_large",
-                        message=f"File exceeds max upload size of {settings.max_upload_mb} MB",
-                        retryable=False,
-                    )
-                digest.update(chunk)
-                file_pointer.write(chunk)
+        stored_blob = await file_store.save(
+            file_id,
+            safe_filename,
+            _upload_chunks(upload),
+            max_size_bytes=max_size_bytes,
+        )
+    except ValueError as exc:
+        if str(exc) != "file_too_large":
+            raise
+        raise api_error(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            code="file_too_large",
+            message=f"File exceeds max upload size of {settings.max_upload_mb} MB",
+            retryable=False,
+        ) from exc
     finally:
         await upload.close()
 
@@ -264,11 +256,35 @@ async def store_uploaded_file(
         uploader_user_id=uploader_user_id,
         filename=safe_filename,
         mime_type=upload.content_type or "application/octet-stream",
-        size_bytes=size_bytes,
-        storage_path=str(storage_path),
-        sha256=digest.hexdigest(),
+        size_bytes=int(stored_blob["size_bytes"]),
+        storage_backend=str(stored_blob["storage_backend"]),
+        storage_path=str(stored_blob["storage_path"]),
+        sha256=str(stored_blob["sha256"]),
     ).to_dict()
     return await metadata_store.create_file(file_object)
+
+
+async def _upload_chunks(upload: UploadFile) -> AsyncIterable[bytes]:
+    while True:
+        chunk = await upload.read(1024 * 1024)
+        if not chunk:
+            break
+        yield chunk
+
+
+async def ensure_attachment_files_exist(
+    metadata_store: Any,
+    attachment_ids: list[str],
+) -> None:
+    for attachment_id in attachment_ids:
+        file_object = await metadata_store.get_file(attachment_id)
+        if file_object is None:
+            raise api_error(
+                status_code=status.HTTP_404_NOT_FOUND,
+                code="attachment_not_found",
+                message=f"Attachment not found: {attachment_id}",
+                retryable=False,
+            )
 
 
 async def ensure_thread_for_root_message(
@@ -499,6 +515,8 @@ async def store_message(
             existing_content = await content_store.get(str(existing["content_ref"])) or {}
             occurred_at = str(existing.get("updated_at") or existing.get("created_at") or now)
             return build_message_response(existing, existing_content), occurred_at, False
+
+    await ensure_attachment_files_exist(metadata_store, payload.attachments)
 
     content_payload = MessageContent(
         text=payload.text,

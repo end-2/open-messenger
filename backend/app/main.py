@@ -50,7 +50,7 @@ async def _unhandled_exception_handler(request: Request, exc: Exception) -> JSON
 
 def create_app() -> FastAPI:
     settings = get_settings()
-    content_store, metadata_store = build_storage_registry(settings)
+    content_store, metadata_store, file_store = build_storage_registry(settings)
 
     app = FastAPI(
         title="Open Messenger API",
@@ -59,6 +59,7 @@ def create_app() -> FastAPI:
     app.state.settings = settings
     app.state.content_store = content_store
     app.state.metadata_store = metadata_store
+    app.state.file_store = file_store
     app.state.event_bus = EventBus()
     app.state.rate_limiter = SlidingWindowRateLimiter(
         max_requests=settings.rate_limit_max_requests,

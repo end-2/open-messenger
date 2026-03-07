@@ -98,7 +98,6 @@ def test_post_and_list_channel_messages_with_cursor() -> None:
             json={
                 "text": f"message-{index}",
                 "sender_user_id": "user-1",
-                "attachments": [f"file-{index}"],
                 "idempotency_key": f"req-{index}",
                 "metadata": {"source": "test"},
             },
@@ -133,6 +132,44 @@ def test_post_and_list_channel_messages_with_cursor() -> None:
     page2_payload = page2.json()
     assert [item["text"] for item in page2_payload["items"]] == ["message-3"]
     assert page2_payload["next_cursor"] is None
+
+
+def test_create_message_with_uploaded_attachment() -> None:
+    client = TestClient(create_app())
+    headers = _issue_bearer_headers(client)
+    channel_id = _create_channel(client, headers)
+
+    upload_response = client.post(
+        "/v1/files",
+        headers=headers,
+        files={"file": ("notes.txt", b"attachment-body", "text/plain")},
+    )
+    assert upload_response.status_code == 201
+    file_id = upload_response.json()["file_id"]
+
+    message_response = client.post(
+        f"/v1/channels/{channel_id}/messages",
+        json={"text": "with attachment", "attachments": [file_id]},
+        headers=headers,
+    )
+
+    assert message_response.status_code == 201
+    assert message_response.json()["attachments"] == [file_id]
+
+
+def test_create_message_rejects_missing_attachment() -> None:
+    client = TestClient(create_app())
+    headers = _issue_bearer_headers(client)
+    channel_id = _create_channel(client, headers)
+
+    response = client.post(
+        f"/v1/channels/{channel_id}/messages",
+        json={"text": "missing attachment", "attachments": ["fil_missing"]},
+        headers=headers,
+    )
+
+    assert response.status_code == 404
+    assert response.json()["code"] == "attachment_not_found"
 
 
 def test_messages_endpoint_returns_404_for_missing_channel() -> None:
@@ -235,7 +272,9 @@ def test_thread_endpoints_validate_target_entities() -> None:
 def test_native_api_works_with_file_backends(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("OPEN_MESSENGER_CONTENT_BACKEND", "file")
     monkeypatch.setenv("OPEN_MESSENGER_METADATA_BACKEND", "file")
+    monkeypatch.setenv("OPEN_MESSENGER_FILE_STORAGE_BACKEND", "local")
     monkeypatch.setenv("OPEN_MESSENGER_STORAGE_DIR", str(tmp_path))
+    monkeypatch.setenv("OPEN_MESSENGER_FILES_ROOT_DIR", str(tmp_path / "files"))
 
     client = TestClient(create_app())
     headers = _issue_bearer_headers(client)

@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     environment: Literal["dev", "staging", "prod", "test"] = "dev"
     content_backend: Literal["memory", "file", "redis"] = "memory"
     metadata_backend: Literal["memory", "file", "mysql"] = "memory"
+    file_storage_backend: Literal["local"] = "local"
     storage_dir: str = "data/storage"
     redis_url: str = "redis://localhost:6379/0"
     redis_content_key_prefix: str = "open_messenger:content"

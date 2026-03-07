@@ -58,6 +58,7 @@ def test_all_entities_produce_dict_payloads() -> None:
             filename="doc.txt",
             mime_type="text/plain",
             size_bytes=4,
+            storage_backend="local",
             storage_path="/tmp/doc.txt",
             sha256="abc123",
         ),
