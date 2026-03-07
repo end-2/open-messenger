@@ -15,6 +15,7 @@ This frontend is a lightweight TypeScript BFF and browser console for the docume
 - Enter the chat page from the main page after supplying or reusing a saved token, instead of editing the token inside the chat room
 - Validate the token before entering `/chat`, and redirect direct `/chat` visits back to `/` when no valid token is available
 - Subscribe to the backend SSE event stream through the frontend proxy
+- Keep the live event stream control as a simple on/off toggle in the left sidebar footer
 
 ## Run
 

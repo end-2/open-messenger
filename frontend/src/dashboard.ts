@@ -361,6 +361,69 @@ function renderBasePage(title: string, bodyClass: string, content: string): stri
         display: grid;
         gap: 4px;
       }
+      .workspace-content {
+        display: grid;
+        gap: 14px;
+        min-height: 0;
+        flex: 1;
+      }
+      .sidebar-footer {
+        margin-top: auto;
+        padding-top: 12px;
+        border-top: 1px solid rgba(255,255,255,0.12);
+      }
+      .stream-toggle-shell {
+        display: grid;
+        gap: 12px;
+      }
+      .stream-toggle-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .toggle-control {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        cursor: pointer;
+      }
+      .toggle-control input {
+        position: absolute;
+        opacity: 0;
+        pointer-events: none;
+      }
+      .toggle-track {
+        position: relative;
+        width: 48px;
+        height: 28px;
+        border-radius: 999px;
+        background: rgba(255,255,255,0.18);
+        border: 1px solid rgba(255,255,255,0.16);
+        transition: background 140ms ease, border-color 140ms ease;
+      }
+      .toggle-track::after {
+        content: "";
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: #f7fbff;
+        transition: transform 140ms ease;
+      }
+      .toggle-control input:checked + .toggle-track {
+        background: rgba(208, 87, 47, 0.88);
+        border-color: rgba(243, 162, 97, 0.9);
+      }
+      .toggle-control input:checked + .toggle-track::after {
+        transform: translateX(20px);
+      }
+      .toggle-control input:focus-visible + .toggle-track {
+        outline: 2px solid rgba(255,255,255,0.7);
+        outline-offset: 2px;
+      }
       .workspace-name {
         font-size: 1.3rem;
         font-weight: 700;
@@ -487,11 +550,6 @@ function renderBasePage(title: string, bodyClass: string, content: string): stri
         border-radius: 999px;
         font-size: 1rem;
         line-height: 1;
-      }
-      .utility-stack {
-        display: grid;
-        gap: 14px;
-        min-height: 0;
       }
       @media (max-width: 980px) {
         .row, .metrics, .home-grid, .chat-layout, .hero { grid-template-columns: 1fr; }
@@ -797,7 +855,7 @@ export function renderChatPage(): string {
             <p class="hint" style="margin-bottom:0;">Enter chat from the main page with a Native API token, then pick a room and chat.</p>
           </div>
           <div class="status" id="session-status"></div>
-          <div class="utility-stack">
+          <div class="workspace-content">
             <div>
               <p class="sidebar-section-title">Create Channel</p>
               <form class="stack" id="channel-form">
@@ -816,17 +874,21 @@ export function renderChatPage(): string {
               <p class="hint" style="margin:0;">Rooms are loaded from the server.</p>
               <ul class="card-list channel-list" id="channel-list"></ul>
             </div>
-            <section class="panel stream-panel" style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.08); box-shadow:none; padding:16px;">
-              <div>
-                <p class="sidebar-section-title" style="margin-bottom:6px;">Live Event Stream</p>
-                <p class="hint" style="margin-bottom:0;">The browser connects through the frontend SSE proxy.</p>
+            <section class="sidebar-footer">
+              <div class="stream-toggle-shell">
+                <div class="stream-toggle-row">
+                  <div>
+                    <p class="sidebar-section-title" style="margin-bottom:6px;">Live Event Stream</p>
+                    <p class="hint" style="margin-bottom:0;">The browser connects through the frontend SSE proxy.</p>
+                  </div>
+                  <label class="toggle-control" for="stream-toggle">
+                    <input type="checkbox" id="stream-toggle" aria-label="Toggle live event stream" />
+                    <span class="toggle-track" aria-hidden="true"></span>
+                  </label>
+                </div>
+                <div class="status" id="stream-status"></div>
+                <ul class="feed scroll-region" id="event-feed"></ul>
               </div>
-              <div class="row">
-                <button type="button" id="start-stream">Start stream</button>
-                <button type="button" class="ghost" id="stop-stream">Stop stream</button>
-              </div>
-              <div class="status" id="stream-status"></div>
-              <ul class="feed scroll-region" id="event-feed"></ul>
             </section>
           </div>
         </aside>
@@ -901,14 +963,14 @@ export function renderChatPage(): string {
       const threadForm = document.querySelector("#thread-form");
       const threadStatus = document.querySelector("#thread-status");
       const refreshMessagesButton = document.querySelector("#refresh-messages");
-      const startStreamButton = document.querySelector("#start-stream");
-      const stopStreamButton = document.querySelector("#stop-stream");
+      const streamToggle = document.querySelector("#stream-toggle");
       const streamStatus = document.querySelector("#stream-status");
       const eventFeed = document.querySelector("#event-feed");
       let activeChannel = null;
       let channels = [];
       let activeThread = null;
       let eventSource = null;
+      let streamEnabled = false;
       let accessToken = "";
       function setStatus(element, message, isSuccess = false) {
         element.textContent = message;
@@ -963,6 +1025,41 @@ export function renderChatPage(): string {
       }
       function getAccessToken() {
         return accessToken;
+      }
+      function syncStreamToggle() {
+        streamToggle.checked = streamEnabled;
+      }
+      function stopEventStream(statusMessage = "Event stream off.", isSuccess = true) {
+        if (eventSource) {
+          eventSource.close();
+          eventSource = null;
+        }
+        streamEnabled = false;
+        syncStreamToggle();
+        setStatus(streamStatus, statusMessage, isSuccess);
+      }
+      function startEventStream() {
+        const accessToken = getAccessToken();
+        if (!accessToken) {
+          stopEventStream("An access token is required.", false);
+          return;
+        }
+        if (eventSource) {
+          eventSource.close();
+        }
+        eventFeed.innerHTML = "";
+        eventSource = new EventSource("/api/events?access_token=" + encodeURIComponent(accessToken));
+        streamEnabled = true;
+        syncStreamToggle();
+        setStatus(streamStatus, "Listening for events...", true);
+        eventSource.onmessage = (event) => {
+          const item = document.createElement("li");
+          item.innerHTML = "<time>" + escapeClientHtml(new Date().toLocaleTimeString()) + "</time><pre class='mono preformatted' style='margin:8px 0 0;'>" + escapeClientHtml(event.data) + "</pre>";
+          eventFeed.prepend(item);
+        };
+        eventSource.onerror = () => {
+          stopEventStream("Event stream disconnected.", false);
+        };
       }
       function renderChannelList() {
         channelList.innerHTML = "";
@@ -1337,39 +1434,20 @@ export function renderChatPage(): string {
         toggleThreadSidebar(false);
         setStatus(threadStatus, "");
       });
-      startStreamButton.addEventListener("click", () => {
-        const accessToken = getAccessToken();
-        if (!accessToken) {
-          setStatus(streamStatus, "An access token is required.");
+      streamToggle.addEventListener("change", () => {
+        if (streamToggle.checked) {
+          startEventStream();
           return;
         }
-        if (eventSource) {
-          eventSource.close();
-        }
-        eventFeed.innerHTML = "";
-        eventSource = new EventSource("/api/events?access_token=" + encodeURIComponent(accessToken));
-        setStatus(streamStatus, "Listening for events...");
-        eventSource.onmessage = (event) => {
-          const item = document.createElement("li");
-          item.innerHTML = "<time>" + escapeClientHtml(new Date().toLocaleTimeString()) + "</time><pre class='mono preformatted' style='margin:8px 0 0;'>" + escapeClientHtml(event.data) + "</pre>";
-          eventFeed.prepend(item);
-        };
-        eventSource.onerror = () => {
-          setStatus(streamStatus, "Event stream disconnected.");
-        };
-      });
-      stopStreamButton.addEventListener("click", () => {
-        if (eventSource) {
-          eventSource.close();
-          eventSource = null;
-        }
-        setStatus(streamStatus, "Event stream stopped.", true);
+        stopEventStream();
       });
       async function initializeChatPage() {
         restoreSession();
         if (!(await validateChatAccessOrRedirect())) {
           return;
         }
+        syncStreamToggle();
+        setStatus(streamStatus, "Event stream off.", true);
         await loadChannels();
         renderThreadPanel();
         toggleThreadSidebar(false);

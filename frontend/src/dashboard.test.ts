@@ -44,6 +44,10 @@ test("renderChatPage includes dedicated chat workflow sections", () => {
 
   assert.match(html, /Create Channel/);
   assert.match(html, /Live Event Stream/);
+  assert.match(html, /id="stream-toggle"/);
+  assert.match(html, /class="sidebar-footer"/);
+  assert.match(html, /function startEventStream\(\)/);
+  assert.match(html, /function stopEventStream\(statusMessage = "Event stream off\."/);
   assert.match(html, /Authenticated sender/);
   assert.match(html, /id="thread-sidebar" hidden/);
   assert.match(html, /id="close-thread"/);
@@ -53,6 +57,8 @@ test("renderChatPage includes dedicated chat workflow sections", () => {
   assert.match(html, /class="feed scroll-region" id="event-feed"/);
   assert.match(html, /class="composer-shell"/);
   assert.match(html, /class="workspace-name">Open Messenger</);
+  assert.doesNotMatch(html, /id="start-stream"/);
+  assert.doesNotMatch(html, /id="stop-stream"/);
   assert.doesNotMatch(html, /Sender user ID/);
   assert.doesNotMatch(html, /Idempotency key/);
   assert.doesNotMatch(html, /<h1/);
