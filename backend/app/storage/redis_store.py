@@ -31,6 +31,23 @@ class RedisMessageContentStore(MessageContentStore):
         if raw_value is None:
             return None
 
+        return self._deserialize(raw_value)
+
+    async def get_many(self, content_ids: list[str]) -> dict[str, dict[str, Any]]:
+        if not content_ids:
+            return {}
+
+        keys = [self._key(content_id) for content_id in content_ids]
+        raw_values = await asyncio.to_thread(self._client.mget, keys)
+        items: dict[str, dict[str, Any]] = {}
+        for content_id, raw_value in zip(content_ids, raw_values):
+            if raw_value is None:
+                continue
+            items[content_id] = self._deserialize(raw_value)
+        return items
+
+    @staticmethod
+    def _deserialize(raw_value: bytes | str) -> dict[str, Any]:
         if isinstance(raw_value, bytes):
             decoded = raw_value.decode("utf-8")
         else:

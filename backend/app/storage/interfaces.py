@@ -13,6 +13,9 @@ class MessageContentStore(Protocol):
     async def get(self, content_id: str) -> dict[str, Any] | None:
         ...
 
+    async def get_many(self, content_ids: list[str]) -> dict[str, dict[str, Any]]:
+        ...
+
     async def delete(self, content_id: str) -> None:
         ...
 
@@ -24,6 +27,9 @@ class MetadataStore(Protocol):
         ...
 
     async def get_user(self, user_id: str) -> dict[str, Any] | None:
+        ...
+
+    async def get_users(self, user_ids: list[str]) -> dict[str, dict[str, Any]]:
         ...
 
     async def create_token(self, token: dict[str, Any]) -> dict[str, Any]:
@@ -63,6 +69,9 @@ class MetadataStore(Protocol):
         ...
 
     async def get_message(self, message_id: str) -> dict[str, Any] | None:
+        ...
+
+    async def get_messages(self, message_ids: list[str]) -> dict[str, dict[str, Any]]:
         ...
 
     async def list_channel_messages(

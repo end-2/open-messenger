@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 
 from app.api.helpers import (
     build_event,
+    hydrate_message_responses,
     discord_message_id_from_sequence,
     format_sse_event,
     has_required_scope,
@@ -43,3 +46,74 @@ def test_event_formatting_and_external_timestamp_helpers() -> None:
     assert unix_timestamp_seconds(occurred_at) == 1772886896
     assert slack_ts_from_sequence(7, occurred_at) == "1772886896.000007"
     assert discord_message_id_from_sequence(7, occurred_at) == "1772886896000007"
+
+
+class _SpyMetadataStore:
+    def __init__(self) -> None:
+        self.get_users_calls = 0
+
+    async def get_users(self, user_ids: list[str]) -> dict[str, dict[str, str]]:
+        self.get_users_calls += 1
+        return {
+            "usr-1": {"user_id": "usr-1", "username": "alice", "display_name": "Alice"},
+            "usr-2": {"user_id": "usr-2", "username": "bob", "display_name": "Bob"},
+        }
+
+
+class _SpyContentStore:
+    def __init__(self) -> None:
+        self.get_many_calls = 0
+
+    async def get_many(self, content_ids: list[str]) -> dict[str, dict[str, str]]:
+        self.get_many_calls += 1
+        return {
+            "cnt-1": {"text": "first"},
+            "cnt-2": {"text": "second"},
+        }
+
+
+def test_hydrate_message_responses_batches_content_and_user_lookups() -> None:
+    metadata_store = _SpyMetadataStore()
+    content_store = _SpyContentStore()
+
+    items = asyncio.run(
+        hydrate_message_responses(
+            [
+                {
+                    "message_id": "msg-1",
+                    "channel_id": "ch-1",
+                    "thread_id": None,
+                    "sender_user_id": "usr-1",
+                    "content_ref": "cnt-1",
+                    "attachments": [],
+                    "created_at": "2026-03-07T00:00:00Z",
+                    "updated_at": "2026-03-07T00:00:00Z",
+                    "deleted_at": None,
+                    "compat_origin": "native",
+                    "idempotency_key": None,
+                    "metadata": {},
+                },
+                {
+                    "message_id": "msg-2",
+                    "channel_id": "ch-1",
+                    "thread_id": None,
+                    "sender_user_id": "usr-2",
+                    "content_ref": "cnt-2",
+                    "attachments": [],
+                    "created_at": "2026-03-07T00:00:01Z",
+                    "updated_at": "2026-03-07T00:00:01Z",
+                    "deleted_at": None,
+                    "compat_origin": "native",
+                    "idempotency_key": None,
+                    "metadata": {},
+                },
+            ],
+            metadata_store,
+            content_store,
+        )
+    )
+
+    assert metadata_store.get_users_calls == 1
+    assert content_store.get_many_calls == 1
+    assert [item["text"] for item in items] == ["first", "second"]
+    assert [item["sender_username"] for item in items] == ["alice", "bob"]

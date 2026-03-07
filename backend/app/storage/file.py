@@ -27,6 +27,14 @@ class FileMessageContentStore(MessageContentStore):
             return None
         return self._read_json(source)
 
+    async def get_many(self, content_ids: list[str]) -> dict[str, dict[str, Any]]:
+        items: dict[str, dict[str, Any]] = {}
+        for content_id in content_ids:
+            payload = await self.get(content_id)
+            if payload is not None:
+                items[content_id] = payload
+        return items
+
     async def delete(self, content_id: str) -> None:
         self._content_path(content_id).unlink(missing_ok=True)
 
@@ -73,6 +81,15 @@ class FileMetadataStore(MetadataStore):
         if record is None:
             return None
         return deepcopy(record)
+
+    async def get_users(self, user_ids: list[str]) -> dict[str, dict[str, Any]]:
+        with self._lock:
+            database = self._read_database()
+            return {
+                user_id: deepcopy(database["users"][user_id])
+                for user_id in user_ids
+                if user_id in database["users"]
+            }
 
     async def create_token(self, token: dict[str, Any]) -> dict[str, Any]:
         token_id = str(token["token_id"])
@@ -225,6 +242,15 @@ class FileMetadataStore(MetadataStore):
         if record is None:
             return None
         return deepcopy(record)
+
+    async def get_messages(self, message_ids: list[str]) -> dict[str, dict[str, Any]]:
+        with self._lock:
+            database = self._read_database()
+            return {
+                message_id: deepcopy(database["messages"][message_id])
+                for message_id in message_ids
+                if message_id in database["messages"]
+            }
 
     async def list_channel_messages(
         self,

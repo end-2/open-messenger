@@ -22,6 +22,7 @@ from .helpers import (
     format_sse_event,
     get_channel_or_404,
     hydrate_message_response,
+    hydrate_message_responses,
     increment_thread_reply,
     new_id,
     publish_event,
@@ -322,10 +323,7 @@ async def list_channel_messages(
 
     await get_channel_or_404(metadata_store, channel_id)
     stored_messages = await metadata_store.list_channel_messages(channel_id, cursor, limit)
-
-    items: list[dict[str, Any]] = []
-    for stored in stored_messages:
-        items.append(await hydrate_message_response(stored, metadata_store, content_store))
+    items = await hydrate_message_responses(stored_messages, metadata_store, content_store)
 
     next_cursor = None
     if len(stored_messages) == limit:
@@ -346,17 +344,18 @@ async def batch_get_messages(
     metadata_store = request.app.state.metadata_store
     content_store = request.app.state.content_store
 
-    items: list[dict[str, Any]] = []
+    ordered_messages: list[dict[str, Any]] = []
     not_found_ids: list[str] = []
+    stored_messages = await metadata_store.get_messages(payload.message_ids)
     for message_id in payload.message_ids:
-        stored = await metadata_store.get_message(message_id)
+        stored = stored_messages.get(message_id)
         if stored is None:
             not_found_ids.append(message_id)
             continue
-        items.append(await hydrate_message_response(stored, metadata_store, content_store))
+        ordered_messages.append(stored)
 
     return {
-        "items": items,
+        "items": await hydrate_message_responses(ordered_messages, metadata_store, content_store),
         "not_found_ids": not_found_ids,
     }
 
@@ -526,10 +525,7 @@ async def get_thread_context(
     return {
         "thread": thread,
         "root_message": await hydrate_message_response(root_message, metadata_store, content_store),
-        "replies": [
-            await hydrate_message_response(reply, metadata_store, content_store)
-            for reply in visible_replies
-        ],
+        "replies": await hydrate_message_responses(visible_replies, metadata_store, content_store),
         "has_more_replies": has_more_replies,
     }
 

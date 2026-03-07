@@ -312,6 +312,20 @@ async def resolve_sender_identity(
     return username, display_name
 
 
+def _sender_identity_from_user(user: dict[str, Any] | None) -> tuple[str | None, str | None]:
+    if user is None:
+        return None, None
+
+    username = str(user.get("username", "")).strip() or None
+    display_name_raw = user.get("display_name")
+    display_name = (
+        str(display_name_raw).strip()
+        if isinstance(display_name_raw, str) and display_name_raw.strip()
+        else None
+    )
+    return username, display_name
+
+
 async def hydrate_message_response(
     stored_message: dict[str, Any],
     metadata_store: Any,
@@ -320,6 +334,43 @@ async def hydrate_message_response(
     content_ref = str(stored_message["content_ref"])
     content_payload = await content_store.get(content_ref) or {}
     return await build_message_response(stored_message, content_payload, metadata_store)
+
+
+async def hydrate_message_responses(
+    stored_messages: list[dict[str, Any]],
+    metadata_store: Any,
+    content_store: Any,
+) -> list[dict[str, Any]]:
+    if not stored_messages:
+        return []
+
+    content_refs = [str(message["content_ref"]) for message in stored_messages]
+    content_payloads = await content_store.get_many(content_refs)
+    sender_user_ids = list(
+        dict.fromkeys(
+            str(message.get("sender_user_id", ""))
+            for message in stored_messages
+            if message.get("sender_user_id") not in {"", None, "system"}
+        )
+    )
+    sender_users = await metadata_store.get_users(sender_user_ids)
+
+    items: list[dict[str, Any]] = []
+    for stored_message in stored_messages:
+        sender_user_id = str(stored_message.get("sender_user_id", "system"))
+        sender_username, sender_display_name = _sender_identity_from_user(
+            sender_users.get(sender_user_id)
+        )
+        items.append(
+            await build_message_response(
+                stored_message,
+                content_payloads.get(str(stored_message["content_ref"]), {}),
+                metadata_store,
+                sender_username=sender_username,
+                sender_display_name=sender_display_name,
+            )
+        )
+    return items
 
 
 async def ensure_thread_for_root_message(
@@ -509,12 +560,16 @@ async def build_message_response(
     metadata: dict[str, Any],
     content_payload: dict[str, Any],
     metadata_store: Any,
+    *,
+    sender_username: str | None = None,
+    sender_display_name: str | None = None,
 ) -> dict[str, Any]:
     sender_user_id = str(metadata.get("sender_user_id", "system"))
-    sender_username, sender_display_name = await resolve_sender_identity(
-        metadata_store,
-        sender_user_id,
-    )
+    if sender_username is None and sender_display_name is None:
+        sender_username, sender_display_name = await resolve_sender_identity(
+            metadata_store,
+            sender_user_id,
+        )
     return {
         "message_id": str(metadata["message_id"]),
         "channel_id": str(metadata["channel_id"]),

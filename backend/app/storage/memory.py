@@ -21,6 +21,14 @@ class InMemoryMessageContentStore(MessageContentStore):
             return None
         return deepcopy(payload)
 
+    async def get_many(self, content_ids: list[str]) -> dict[str, dict[str, Any]]:
+        items: dict[str, dict[str, Any]] = {}
+        for content_id in content_ids:
+            payload = self._content.get(content_id)
+            if payload is not None:
+                items[content_id] = deepcopy(payload)
+        return items
+
     async def delete(self, content_id: str) -> None:
         self._content.pop(content_id, None)
 
@@ -50,6 +58,14 @@ class InMemoryMetadataStore(MetadataStore):
         if user is None:
             return None
         return deepcopy(user)
+
+    async def get_users(self, user_ids: list[str]) -> dict[str, dict[str, Any]]:
+        users: dict[str, dict[str, Any]] = {}
+        for user_id in user_ids:
+            user = self._users.get(user_id)
+            if user is not None:
+                users[user_id] = deepcopy(user)
+        return users
 
     async def create_token(self, token: dict[str, Any]) -> dict[str, Any]:
         token_id = str(token["token_id"])
@@ -165,6 +181,14 @@ class InMemoryMetadataStore(MetadataStore):
         if msg is None:
             return None
         return deepcopy(msg)
+
+    async def get_messages(self, message_ids: list[str]) -> dict[str, dict[str, Any]]:
+        messages: dict[str, dict[str, Any]] = {}
+        for message_id in message_ids:
+            message = self._messages.get(message_id)
+            if message is not None:
+                messages[message_id] = deepcopy(message)
+        return messages
 
     async def list_channel_messages(
         self,

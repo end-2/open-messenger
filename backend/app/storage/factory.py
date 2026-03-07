@@ -24,6 +24,10 @@ class UnsupportedMessageContentStore(MessageContentStore):
     async def get(self, content_id: str) -> dict[str, Any] | None:
         self._raise_not_supported()
 
+    async def get_many(self, content_ids: list[str]) -> dict[str, dict[str, Any]]:
+        del content_ids
+        self._raise_not_supported()
+
     async def delete(self, content_id: str) -> None:
         self._raise_not_supported()
 
@@ -43,6 +47,10 @@ class UnsupportedMetadataStore(MetadataStore):
         self._raise_not_supported()
 
     async def get_user(self, user_id: str) -> dict[str, Any] | None:
+        self._raise_not_supported()
+
+    async def get_users(self, user_ids: list[str]) -> dict[str, dict[str, Any]]:
+        del user_ids
         self._raise_not_supported()
 
     async def create_token(self, token: dict[str, Any]) -> dict[str, Any]:
@@ -82,6 +90,10 @@ class UnsupportedMetadataStore(MetadataStore):
         self._raise_not_supported()
 
     async def get_message(self, message_id: str) -> dict[str, Any] | None:
+        self._raise_not_supported()
+
+    async def get_messages(self, message_ids: list[str]) -> dict[str, dict[str, Any]]:
+        del message_ids
         self._raise_not_supported()
 
     async def list_channel_messages(

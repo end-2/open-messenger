@@ -73,6 +73,9 @@ class MySQLMetadataStore(MetadataStore):
         )
         return self._deserialize_row(row)
 
+    async def get_users(self, user_ids: list[str]) -> dict[str, dict[str, Any]]:
+        return await self._fetch_entities_by_ids("users", "entity_id", user_ids)
+
     async def create_token(self, token: dict[str, Any]) -> dict[str, Any]:
         token_id = str(token["token_id"])
         record = deepcopy(token)
@@ -252,6 +255,9 @@ class MySQLMetadataStore(MetadataStore):
         )
         return self._deserialize_row(row)
 
+    async def get_messages(self, message_ids: list[str]) -> dict[str, dict[str, Any]]:
+        return await self._fetch_entities_by_ids("messages", "message_id", message_ids)
+
     async def list_channel_messages(
         self,
         channel_id: str,
@@ -424,6 +430,34 @@ class MySQLMetadataStore(MetadataStore):
     async def next_compat_sequence(self, origin: str, channel_id: str) -> int:
         await asyncio.to_thread(self._ensure_schema)
         return await asyncio.to_thread(self._next_compat_sequence_sync, origin, channel_id)
+
+    async def _fetch_entities_by_ids(
+        self,
+        table_suffix: str,
+        id_column: str,
+        entity_ids: list[str],
+    ) -> dict[str, dict[str, Any]]:
+        unique_ids = list(dict.fromkeys(entity_ids))
+        if not unique_ids:
+            return {}
+
+        placeholders = ",".join(["%s"] * len(unique_ids))
+        rows = await self._run_fetchall(
+            f"""
+            SELECT {id_column} AS entity_id, payload
+            FROM {self._table(table_suffix)}
+            WHERE {id_column} IN ({placeholders})
+            """,
+            tuple(unique_ids),
+        )
+        items: dict[str, dict[str, Any]] = {}
+        for row in rows:
+            payload = self._deserialize_row(row)
+            entity_id = row.get("entity_id")
+            if payload is None or entity_id is None:
+                continue
+            items[str(entity_id)] = payload
+        return items
 
     def _initialize(self) -> None:
         for statement in self._schema_statements():

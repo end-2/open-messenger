@@ -162,6 +162,14 @@ Docker:
 
 `make e2e` and `make e2e-docker` both run the full native API end-to-end suite, including the multi-user scenario. The Docker E2E run also verifies that the native API scenario persisted the expected message content in Redis and the related metadata rows in MySQL.
 
+Storage read-path benchmark:
+
+- Local API in `venv`: `OPEN_MESSENGER_CONTENT_BACKEND=redis OPEN_MESSENGER_METADATA_BACKEND=mysql OPEN_MESSENGER_REDIS_URL=redis://localhost:6379/0 OPEN_MESSENGER_MYSQL_DSN=mysql+pymysql://app:app@localhost:3306/open_messenger make run`
+- Benchmark against the local API: `.venv/bin/python scripts/perf_storage_roundtrip.py --base-url http://127.0.0.1:8000`
+- Benchmark against the Docker API stack: `docker compose up -d api redis mysql && .venv/bin/python scripts/perf_storage_roundtrip.py --base-url http://127.0.0.1:8000`
+
+The benchmark seeds a channel, creates root and threaded messages, and reports average, p50, p95, and max latency for `GET /v1/channels/{channel_id}/messages`, `POST /v1/messages:batchGet`, and `GET /v1/threads/{thread_id}/context`.
+
 ## Make Targets
 
 - `make fullstack-up`: start frontend, API, Redis, MySQL, and Tempo in Docker

@@ -210,6 +210,18 @@ class InMemoryMySQLMetadataStore(MySQLMetadataStore):
 
     def _run_fetchall_sync(self, sql: str, params=()):
         normalized = " ".join(sql.lower().split())
+        if "from" in normalized and self._table("users") in normalized and "in (" in normalized:
+            return [
+                {"entity_id": user_id, "payload": self._users[user_id]}
+                for user_id in params
+                if user_id in self._users
+            ]
+        if "from" in normalized and self._table("messages") in normalized and "in (" in normalized:
+            return [
+                {"entity_id": message_id, "payload": self._messages[message_id]["payload"]}
+                for message_id in params
+                if message_id in self._messages
+            ]
         if "from" not in normalized or self._table("messages") not in normalized:
             return []
 
@@ -290,6 +302,7 @@ def test_mysql_metadata_store_contract_with_in_memory_backend() -> None:
         )
     )
     assert asyncio.run(store.get_user("usr-1")) == user
+    assert asyncio.run(store.get_users(["usr-1", "usr-missing"])) == {"usr-1": user}
 
     token = asyncio.run(
         store.create_token(
@@ -376,6 +389,10 @@ def test_mysql_metadata_store_contract_with_in_memory_backend() -> None:
     assert page2 == [{"message_id": "msg-3", "channel_id": "channel-a", "content_ref": "content-3"}]
     assert thread_page == []
     assert asyncio.run(store.get_message(m1["message_id"])) == m1
+    assert asyncio.run(store.get_messages(["msg-3", "msg-1", "msg-missing"])) == {
+        "msg-1": {"message_id": "msg-1", "channel_id": "channel-a", "content_ref": "content-1"},
+        "msg-3": {"message_id": "msg-3", "channel_id": "channel-a", "content_ref": "content-3"},
+    }
 
     asyncio.run(
         store.create_message(
