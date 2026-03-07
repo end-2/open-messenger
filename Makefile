@@ -5,7 +5,7 @@ PIP := $(VENV_DIR)/bin/pip
 PYTEST := $(VENV_DIR)/bin/pytest
 UVICORN := $(VENV_DIR)/bin/uvicorn
 
-.PHONY: help venv install run build test e2e e2e-matrix test-docker e2e-docker e2e-matrix-docker test-frontend-docker test-frontend-cli-docker up down fullstack-up fullstack-down deploy-single-config deploy-staging-config deploy-prod-config clean
+.PHONY: help venv install run build test e2e test-docker e2e-docker test-frontend-docker test-frontend-cli-docker up down fullstack-up fullstack-down deploy-single-config deploy-staging-config deploy-prod-config clean
 
 help:
 	@echo "Available targets:"
@@ -14,9 +14,9 @@ help:
 	@echo "  run          Run API server locally"
 	@echo "  build        Build the frontend CLI binary in Docker"
 	@echo "  test         Run unit tests in local venv"
-	@echo "  e2e          Run all end-to-end API checks locally, including the multi-user matrix (starts temporary API server)"
+	@echo "  e2e          Run all end-to-end API checks locally, including the multi-user scenario (starts temporary API server)"
 	@echo "  test-docker  Run unit tests in Docker"
-	@echo "  e2e-docker   Run all end-to-end API checks in Docker, including the multi-user matrix"
+	@echo "  e2e-docker   Run all end-to-end API checks in Docker, including the multi-user scenario"
 	@echo "  test-frontend-docker  Run frontend unit test in Docker"
 	@echo "  test-frontend-cli-docker  Run frontend CLI unit test in Docker"
 	@echo "  up           Start deployment test stack (API, Redis, MySQL, Prometheus, Loki, Tempo, Grafana)"
@@ -55,8 +55,6 @@ e2e: install
 	$(VENV_DIR)/bin/python scripts/e2e_native_api.py --base-url http://127.0.0.1:18000; \
 	PYTHONPATH=backend $(VENV_DIR)/bin/python scripts/e2e_native_matrix.py --base-url http://127.0.0.1:18000
 
-e2e-matrix: e2e
-
 test-docker:
 	docker compose --profile test run --rm --build test
 
@@ -64,10 +62,7 @@ e2e-docker:
 	@set -euo pipefail; \
 	docker compose up --build -d api redis mysql; \
 	trap 'docker compose down --volumes --remove-orphans' EXIT; \
-	docker compose --profile test run --rm --build e2e; \
-	docker compose --profile test run --rm --build e2e-matrix
-
-e2e-matrix-docker: e2e-docker
+	docker compose --profile test run --rm --build e2e
 
 test-frontend-docker:
 	docker run --rm -v "$$PWD":/workspace -w /workspace/frontend node:22-alpine npm test
