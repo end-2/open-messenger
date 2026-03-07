@@ -1,0 +1,389 @@
+from __future__ import annotations
+
+from asyncio import Queue, TimeoutError, wait_for
+from pathlib import Path
+from typing import Any, Optional
+
+from fastapi import APIRouter, Depends, File, Query, Request, Response, UploadFile, status
+from fastapi.responses import FileResponse, StreamingResponse
+
+from app.auth import AuthContext, require_scopes
+from app.config import Settings, get_settings
+from app.domain import Channel, Thread
+from app.errors import api_error
+
+from .helpers import (
+    build_file_response,
+    build_message_response,
+    format_sse_event,
+    get_channel_or_404,
+    increment_thread_reply,
+    new_id,
+    publish_event,
+    store_message,
+    store_uploaded_file,
+    utc_now_iso,
+)
+from .schemas import (
+    ChannelResponse,
+    CreateChannelRequest,
+    CreateMessageRequest,
+    CreateThreadRequest,
+    FileObjectResponse,
+    ListMessagesResponse,
+    MessageResponse,
+    ThreadResponse,
+)
+
+
+router = APIRouter()
+
+
+@router.get("/v1/events/stream")
+async def stream_events(
+    request: Request,
+    _: AuthContext = Depends(require_scopes(["messages:read"])),
+) -> StreamingResponse:
+    event_bus = request.app.state.event_bus
+    queue: Queue[dict[str, Any]] = await event_bus.subscribe()
+
+    async def event_stream():
+        yield ": connected\n\n"
+        try:
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    event = await wait_for(queue.get(), timeout=15)
+                except TimeoutError:
+                    yield ": keep-alive\n\n"
+                    continue
+                yield format_sse_event(event)
+        finally:
+            await event_bus.unsubscribe(queue)
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        },
+    )
+
+
+@router.get("/healthz")
+def healthz() -> dict[str, str]:
+    return {"status": "ok"}
+
+
+@router.get("/v1/info")
+def service_info(
+    request: Request,
+    settings: Settings = Depends(get_settings),
+) -> dict[str, str]:
+    content_store = request.app.state.content_store
+    metadata_store = request.app.state.metadata_store
+
+    return {
+        "service": settings.app_name,
+        "version": settings.api_version,
+        "environment": settings.environment,
+        "content_backend": settings.content_backend,
+        "metadata_backend": settings.metadata_backend,
+        "content_store_impl": content_store.__class__.__name__,
+        "metadata_store_impl": metadata_store.__class__.__name__,
+    }
+
+
+@router.post(
+    "/v1/channels",
+    response_model=ChannelResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_channel(
+    payload: CreateChannelRequest,
+    request: Request,
+    _: AuthContext = Depends(require_scopes(["channels:write"])),
+) -> dict[str, Any]:
+    metadata_store = request.app.state.metadata_store
+    channel = Channel(
+        channel_id=new_id("ch"),
+        name=payload.name,
+    ).to_dict()
+    return await metadata_store.create_channel(channel)
+
+
+@router.get("/v1/channels/{channel_id}", response_model=ChannelResponse)
+async def get_channel(
+    channel_id: str,
+    request: Request,
+    _: AuthContext = Depends(require_scopes(["channels:read"])),
+) -> dict[str, Any]:
+    metadata_store = request.app.state.metadata_store
+    return await get_channel_or_404(metadata_store, channel_id)
+
+
+@router.post(
+    "/v1/channels/{channel_id}/messages",
+    response_model=MessageResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_channel_message(
+    channel_id: str,
+    payload: CreateMessageRequest,
+    request: Request,
+    response: Response,
+    _: AuthContext = Depends(require_scopes(["messages:write"])),
+) -> dict[str, Any]:
+    metadata_store = request.app.state.metadata_store
+    content_store = request.app.state.content_store
+
+    await get_channel_or_404(metadata_store, channel_id)
+
+    if payload.thread_id is not None:
+        thread = await metadata_store.get_thread(payload.thread_id)
+        if thread is None:
+            raise api_error(
+                status_code=status.HTTP_404_NOT_FOUND,
+                code="thread_not_found",
+                message="Thread not found",
+                retryable=False,
+            )
+        if str(thread.get("channel_id")) != channel_id:
+            raise api_error(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                code="thread_channel_mismatch",
+                message="Thread does not belong to the channel",
+                retryable=False,
+            )
+
+    message_response, occurred_at, created = await store_message(
+        channel_id=channel_id,
+        payload=payload,
+        metadata_store=metadata_store,
+        content_store=content_store,
+    )
+    if payload.thread_id is not None and created:
+        await increment_thread_reply(metadata_store, payload.thread_id, occurred_at)
+    if created:
+        await publish_event(
+            request,
+            event_type="message.created",
+            occurred_at=occurred_at,
+            data={
+                "channel_id": channel_id,
+                "thread_id": message_response["thread_id"],
+                "message_id": message_response["message_id"],
+                "sender_user_id": message_response["sender_user_id"],
+                "compat_origin": message_response["compat_origin"],
+                "attachments": message_response["attachments"],
+            },
+        )
+    if not created:
+        response.status_code = status.HTTP_200_OK
+    return message_response
+
+
+@router.get("/v1/channels/{channel_id}/messages", response_model=ListMessagesResponse)
+async def list_channel_messages(
+    channel_id: str,
+    request: Request,
+    cursor: Optional[str] = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+    _: AuthContext = Depends(require_scopes(["messages:read"])),
+) -> dict[str, Any]:
+    metadata_store = request.app.state.metadata_store
+    content_store = request.app.state.content_store
+
+    await get_channel_or_404(metadata_store, channel_id)
+    stored_messages = await metadata_store.list_channel_messages(channel_id, cursor, limit)
+
+    items: list[dict[str, Any]] = []
+    for stored in stored_messages:
+        content_ref = str(stored["content_ref"])
+        content_payload = await content_store.get(content_ref) or {}
+        items.append(build_message_response(stored, content_payload))
+
+    next_cursor = None
+    if len(stored_messages) == limit:
+        next_cursor = str(stored_messages[-1]["message_id"])
+
+    return {
+        "items": items,
+        "next_cursor": next_cursor,
+    }
+
+
+@router.post(
+    "/v1/channels/{channel_id}/threads",
+    response_model=ThreadResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_channel_thread(
+    channel_id: str,
+    payload: CreateThreadRequest,
+    request: Request,
+    _: AuthContext = Depends(require_scopes(["messages:write"])),
+) -> dict[str, Any]:
+    metadata_store = request.app.state.metadata_store
+
+    await get_channel_or_404(metadata_store, channel_id)
+    root_message = await metadata_store.get_message(payload.root_message_id)
+    if root_message is None:
+        raise api_error(
+            status_code=status.HTTP_404_NOT_FOUND,
+            code="root_message_not_found",
+            message="Root message not found",
+            retryable=False,
+        )
+    if str(root_message.get("channel_id")) != channel_id:
+        raise api_error(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            code="root_message_channel_mismatch",
+            message="Root message does not belong to the channel",
+            retryable=False,
+        )
+
+    now = utc_now_iso()
+    thread = Thread(
+        thread_id=new_id("th"),
+        channel_id=channel_id,
+        root_message_id=payload.root_message_id,
+        reply_count=0,
+        last_message_at=str(root_message.get("created_at", now)),
+        created_at=now,
+    ).to_dict()
+    created_thread = await metadata_store.create_thread(thread)
+    await publish_event(
+        request,
+        event_type="thread.created",
+        occurred_at=str(created_thread["created_at"]),
+        data={
+            "channel_id": str(created_thread["channel_id"]),
+            "thread_id": str(created_thread["thread_id"]),
+            "root_message_id": str(created_thread["root_message_id"]),
+            "reply_count": int(created_thread["reply_count"]),
+        },
+    )
+    return created_thread
+
+
+@router.post(
+    "/v1/threads/{thread_id}/messages",
+    response_model=MessageResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_thread_message(
+    thread_id: str,
+    payload: CreateMessageRequest,
+    request: Request,
+    response: Response,
+    _: AuthContext = Depends(require_scopes(["messages:write"])),
+) -> dict[str, Any]:
+    metadata_store = request.app.state.metadata_store
+    content_store = request.app.state.content_store
+
+    thread = await metadata_store.get_thread(thread_id)
+    if thread is None:
+        raise api_error(
+            status_code=status.HTTP_404_NOT_FOUND,
+            code="thread_not_found",
+            message="Thread not found",
+            retryable=False,
+        )
+
+    if payload.thread_id is not None and payload.thread_id != thread_id:
+        raise api_error(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            code="thread_id_mismatch",
+            message="Thread ID in payload does not match URL",
+            retryable=False,
+        )
+
+    channel_id = str(thread["channel_id"])
+    message_response, occurred_at, created = await store_message(
+        channel_id=channel_id,
+        payload=payload,
+        metadata_store=metadata_store,
+        content_store=content_store,
+        force_thread_id=thread_id,
+    )
+    if created:
+        await increment_thread_reply(metadata_store, thread_id, occurred_at)
+        await publish_event(
+            request,
+            event_type="message.created",
+            occurred_at=occurred_at,
+            data={
+                "channel_id": channel_id,
+                "thread_id": thread_id,
+                "message_id": message_response["message_id"],
+                "sender_user_id": message_response["sender_user_id"],
+                "compat_origin": message_response["compat_origin"],
+                "attachments": message_response["attachments"],
+            },
+        )
+    else:
+        response.status_code = status.HTTP_200_OK
+    return message_response
+
+
+@router.post(
+    "/v1/files",
+    response_model=FileObjectResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def upload_file(
+    request: Request,
+    file: UploadFile = File(...),
+    context: AuthContext = Depends(require_scopes(["files:write"])),
+) -> dict[str, Any]:
+    settings: Settings = request.app.state.settings
+    metadata_store = request.app.state.metadata_store
+    stored = await store_uploaded_file(settings, metadata_store, file, context.user_id)
+    await publish_event(
+        request,
+        event_type="file.uploaded",
+        occurred_at=str(stored["created_at"]),
+        data={
+            "file_id": str(stored["file_id"]),
+            "uploader_user_id": str(stored["uploader_user_id"]),
+            "filename": str(stored["filename"]),
+            "mime_type": str(stored["mime_type"]),
+            "size_bytes": int(stored["size_bytes"]),
+        },
+    )
+    return build_file_response(stored)
+
+
+@router.get("/v1/files/{file_id}")
+async def get_file(
+    file_id: str,
+    request: Request,
+    _: AuthContext = Depends(require_scopes(["files:read"])),
+) -> FileResponse:
+    metadata_store = request.app.state.metadata_store
+    file_object = await metadata_store.get_file(file_id)
+    if file_object is None:
+        raise api_error(
+            status_code=status.HTTP_404_NOT_FOUND,
+            code="file_not_found",
+            message="File not found",
+            retryable=False,
+        )
+
+    storage_path = Path(str(file_object.get("storage_path", "")))
+    if not storage_path.exists():
+        raise api_error(
+            status_code=status.HTTP_404_NOT_FOUND,
+            code="file_not_found",
+            message="File not found",
+            retryable=False,
+        )
+
+    return FileResponse(
+        path=storage_path,
+        media_type=str(file_object.get("mime_type") or "application/octet-stream"),
+        filename=str(file_object.get("filename") or storage_path.name),
+    )
