@@ -385,3 +385,24 @@ def test_mysql_metadata_store_serialization_roundtrip() -> None:
 
     assert json.loads(encoded) == payload
     assert decoded == payload
+
+
+def test_mysql_idempotency_query_treats_json_null_thread_as_match() -> None:
+    class CapturingStore(InMemoryMySQLMetadataStore):
+        def __init__(self) -> None:
+            super().__init__()
+            self.last_sql = ""
+            self.last_params = ()
+
+        def _run_fetchone_sync(self, sql: str, params=()):
+            self.last_sql = sql
+            self.last_params = params
+            return None
+
+    store = CapturingStore()
+
+    asyncio.run(store.find_message_by_idempotency("channel-a", None, "req-1"))
+
+    normalized = " ".join(store.last_sql.lower().split())
+    assert "json_type(json_extract(payload, '$.thread_id'))='null'" in normalized
+    assert store.last_params == ("channel-a", "req-1", None, None)

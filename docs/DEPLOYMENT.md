@@ -35,6 +35,8 @@ Optional runtime overrides:
 
 ## Container Workflows
 
+The default repository `docker compose.yml` starts the `api` service with `redis + mysql` backends.
+
 Development and verification commands:
 
 1. Start the deployment test stack with `make up`.

@@ -32,8 +32,10 @@ services:
     container_name: open-messenger-api
     environment:
       OPEN_MESSENGER_ENVIRONMENT: dev
-      OPEN_MESSENGER_CONTENT_BACKEND: memory
-      OPEN_MESSENGER_METADATA_BACKEND: memory
+      OPEN_MESSENGER_CONTENT_BACKEND: redis
+      OPEN_MESSENGER_METADATA_BACKEND: mysql
+      OPEN_MESSENGER_REDIS_URL: redis://redis:6379/0
+      OPEN_MESSENGER_MYSQL_DSN: mysql+pymysql://app:app@mysql:3306/open_messenger
       OPEN_MESSENGER_TRACING_ENABLED: "true"
       OPEN_MESSENGER_OTLP_TRACES_ENDPOINT: http://tempo:4318/v1/traces
     ports:

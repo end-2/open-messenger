@@ -276,7 +276,13 @@ class MySQLMetadataStore(MetadataStore):
             WHERE channel_id=%s
               AND JSON_UNQUOTE(JSON_EXTRACT(payload, '$.idempotency_key'))=%s
               AND (
-                (%s IS NULL AND JSON_EXTRACT(payload, '$.thread_id') IS NULL)
+                (
+                  %s IS NULL
+                  AND (
+                    JSON_EXTRACT(payload, '$.thread_id') IS NULL
+                    OR JSON_TYPE(JSON_EXTRACT(payload, '$.thread_id'))='NULL'
+                  )
+                )
                 OR JSON_UNQUOTE(JSON_EXTRACT(payload, '$.thread_id'))=%s
               )
             ORDER BY sequence_id ASC

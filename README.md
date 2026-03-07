@@ -42,6 +42,8 @@ Start the full application stack in Docker:
 make fullstack-up
 ```
 
+The default `docker compose` application stack runs the API with `redis` for message content and `mysql` for metadata.
+
 Run tests in Docker:
 
 ```bash
